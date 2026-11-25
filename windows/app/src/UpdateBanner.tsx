@@ -7,9 +7,27 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
     // Errors come back as a "failed" status event.
     invoke("install_update").catch(() => {});
   };
+  const dismiss = () => {
+    invoke("dismiss_update_status").catch(() => {});
+  };
   switch (status.kind) {
     case "none":
       return null;
+    case "checking":
+      return (
+        <div className="update" role="status">
+          <span>Checking for updates…</span>
+        </div>
+      );
+    case "upToDate":
+      return (
+        <div className="update" role="status">
+          <span>QC Buddy {status.version} is up to date.</span>
+          <button type="button" className="link-button" onClick={dismiss}>
+            OK
+          </button>
+        </div>
+      );
     case "available":
       return (
         <div className="update" role="status">
@@ -35,8 +53,17 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
       return (
         <div className="update failed" role="alert">
           <span>{status.message}</span>
-          <button type="button" className="link-button" onClick={install}>
+          <button
+            type="button"
+            className="link-button"
+            onClick={() =>
+              status.retry === "check" ? invoke("check_for_updates").catch(() => {}) : install()
+            }
+          >
             Try again
+          </button>
+          <button type="button" className="link-button" aria-label="Dismiss" onClick={dismiss}>
+            ×
           </button>
         </div>
       );

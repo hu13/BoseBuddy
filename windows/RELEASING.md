@@ -49,3 +49,6 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
   updater only offers newer versions), but nobody else is offered it.
 - Drafts are never offered: the feed changes only when a release is
   published.
+- **Check by hand:** `QCBuddy.exe --check-for-updates` (the running copy
+  checks and shows the result in the flyout), or right-click the tray icon →
+  **Check for updates**.
