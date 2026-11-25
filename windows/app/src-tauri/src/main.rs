@@ -22,6 +22,7 @@ use tauri::{AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, WebviewW
 
 mod presets;
 mod snapshot;
+mod updates;
 
 use snapshot::{Latest, Snapshot};
 
@@ -103,10 +104,24 @@ fn delete_preset(id: String) -> Vec<EqPreset> {
     presets::delete(&presets_path(), &id)
 }
 
+/// Whether an update is available, downloading or installing.
+#[tauri::command]
+fn update_status(updates: tauri::State<'_, updates::Updates>) -> updates::UpdateStatus {
+    updates.status()
+}
+
+/// "Install and restart": download, verify, install, restart.
+#[tauri::command]
+async fn install_update(app: AppHandle) -> Result<(), String> {
+    updates::install(app).await
+}
+
 fn main() {
     tauri::Builder::default()
         // Must be first: a second launch just opens the running app's flyout.
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show(app)))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
             get_state,
             send,
@@ -115,7 +130,9 @@ fn main() {
             presets,
             save_preset,
             rename_preset,
-            delete_preset
+            delete_preset,
+            update_status,
+            install_update
         ])
         .setup(|app| {
             let handle = app.handle().clone();
@@ -133,6 +150,7 @@ fn main() {
             });
 
             build_tray(&handle)?;
+            updates::start(handle.clone());
             watch_taskbar_theme(handle.clone());
             if let Some(window) = handle.get_webview_window(FLYOUT) {
                 let app = handle.clone();

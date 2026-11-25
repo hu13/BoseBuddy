@@ -70,6 +70,14 @@ export interface AppState {
 }
 
 /** What the app emits: the state with a revision that only goes up. */
+/** The app's auto-update state (src-tauri/src/updates.rs). */
+export type UpdateStatus =
+  | { kind: "none" }
+  | { kind: "available"; version: string }
+  | { kind: "downloading"; percent: number | null }
+  | { kind: "installing" }
+  | { kind: "failed"; message: string };
+
 export interface Snapshot {
   revision: number;
   state: AppState;
