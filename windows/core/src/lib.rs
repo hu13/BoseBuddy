@@ -7,6 +7,8 @@ pub mod eq_presets;
 pub mod fake;
 pub mod identity;
 pub mod log;
+#[cfg(target_os = "macos")]
+mod macos;
 pub mod models;
 pub mod modes;
 pub mod peers;

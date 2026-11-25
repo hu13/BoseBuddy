@@ -1,0 +1,11 @@
+{
+  "identifier": "com.qcbuddy.desktop",
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "icon": ["icons/icon.icns"],
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "infoPlist": "Info.macos.plist"
+    }
+  }
+}

@@ -1,7 +1,8 @@
+import { setHostPlatform } from "../platform";
 // Tauri's IPC doesn't exist in tests: invoke() is a mock that resolves to
 // null (tests inspect its calls), and listen() keeps handlers so tests can
 // emit events (see emit() in helpers.ts).
-import { afterEach, vi } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 
 type Handler = (event: { payload: unknown }) => void;
@@ -31,3 +32,5 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+beforeEach(() => setHostPlatform("windows"));

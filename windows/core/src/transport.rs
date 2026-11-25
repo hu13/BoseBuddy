@@ -57,8 +57,8 @@ where
             // other channels would each wait just as long. Stop here.
             Err(BmapError::Timeout) if silent.is_empty() => {
                 return Err(BmapError::Transport(format!(
-                    "The headphones didn't respond within {} s. Make sure they're on, nearby and connected to this PC.",
-                    CONNECT_TIMEOUT.as_secs()
+                    "The headphones didn't respond within {} s. Make sure they're on, nearby and connected to {}.",
+                    CONNECT_TIMEOUT.as_secs(), crate::platform::this_computer()
                 )))
             }
             Err(e) => refused.push(format!("channel {channel}: {e}")),
@@ -74,8 +74,8 @@ where
         )));
     }
     Err(BmapError::Transport(format!(
-        "Couldn't open the Bluetooth control channel ({}). Make sure the headphones are on and connected to this PC.",
-        refused.join("; ")
+        "Couldn't open the Bluetooth control channel ({}). Make sure the headphones are on and connected to {}.",
+        refused.join("; "), crate::platform::this_computer()
     )))
 }
 

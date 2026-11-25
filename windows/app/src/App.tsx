@@ -1,3 +1,4 @@
+import { localComputer } from "./platform";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -191,7 +192,7 @@ export function ConnectCard({ state }: { state: AppState }) {
       <p>
         {none
           ? "Pair your Bose headphones in Settings → Bluetooth & devices, then come back here."
-          : "Turn the headphones on and connect them to this PC, then click Connect."}
+          : `Turn the headphones on and connect them to ${localComputer().lower}, then click Connect.`}
       </p>
       {!none && (
         <button type="button" className="primary" disabled={connecting} onClick={() => send({ type: "connect", args: null })}>

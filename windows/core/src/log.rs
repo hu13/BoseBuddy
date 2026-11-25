@@ -22,8 +22,12 @@ enum Sink {
     FileAndStderr(PathBuf),
 }
 
-/// `%LOCALAPPDATA%\QC Buddy`, or the temp dir if LOCALAPPDATA is unset.
+/// Native application data directory, with a temporary-directory fallback.
 pub fn data_dir() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    if let Some(home) = std::env::var_os("HOME") {
+        return PathBuf::from(home).join("Library/Application Support/QC Buddy");
+    }
     std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(std::env::temp_dir)
