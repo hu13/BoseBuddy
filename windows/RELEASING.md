@@ -76,6 +76,10 @@ signs it and updates it: the Store copy never reads the update feed, and
 
 **Once:**
 
+- The listing text, privacy policy URL and other fields are in
+  [`STORE-LISTING.md`](STORE-LISTING.md); the policy is
+  [`PRIVACY.md`](PRIVACY.md). Update them when features or data handling
+  change.
 - In Partner Center, the product must be an **MSIX or PWA app** (an "EXE or
   MSI app" product only takes an installer URL; its type can't be changed).
 - Copy QCBuddy → **Product identity** into repository variables:
