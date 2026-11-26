@@ -1,6 +1,6 @@
 # qcbuddy-core
 
-QC Buddy without the UI: the BMAP protocol, the controller (a port of
+QCBuddy without the UI: the BMAP protocol, the controller (a port of
 BoseBuddy's `BoseController.swift`), device discovery, logging and EQ presets.
 The tray app (M2) depends on it. It also builds the **`qcbuddy` CLI**, which
 runs every feature from a terminal, so the hardware can be tested without the

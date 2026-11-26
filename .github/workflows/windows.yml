@@ -1,11 +1,16 @@
 name: Windows
 
+# Pull requests only (and by hand); pushes don't build.
 on:
-  push:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml"]
+    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
   workflow_dispatch:
+
+env:
+  # No debug symbols in CI builds: smaller, faster to link (no huge .pdb
+  # files), and smaller caches. Tests and panics still report file and line.
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
   core:
@@ -16,17 +21,31 @@ jobs:
       run:
         working-directory: windows/core
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/core
-      - run: cargo clippy --all-targets -- -D warnings
+          # rust-cache keys only on the toolchain and lockfiles, and doesn't
+          # save again on an exact hit. Without the workflows in the key, a
+          # cache saved by older steps (the first app run saved clippy-only
+          # metadata) is restored forever while every run rebuilds everything.
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
       - run: cargo test
+      - run: cargo clippy --all-targets -- -D warnings
       - name: CLI smoke test (simulated headset)
         run: cargo run --quiet --bin qcbuddy -- --fake status
+      - name: MSIX packaging (manifest, resources, makeappx)
+        # A stand-in exe (the debug CLI) and a placeholder identity:
+        # checks the manifest and the script, not the app. The release
+        # workflow packages the real build.
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ../app/src-tauri/target/release | Out-Null
+          Copy-Item target/debug/qcbuddy.exe ../app/src-tauri/target/release/QCBuddy.exe
+          ../app/scripts/package-msix.ps1 -IdentityName QCBuddy.Local -Publisher "CN=QCBuddyLocal" -PublisherDisplayName "QCBuddy (local)" -Out ../../msix-check
 
   app:
     # UI tests (render from core/src/ui_fixtures.rs fixtures), type check,
@@ -36,8 +55,8 @@ jobs:
       run:
         working-directory: windows/app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -48,6 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
       - run: npm ci
       - run: npm test
       - run: npm run build

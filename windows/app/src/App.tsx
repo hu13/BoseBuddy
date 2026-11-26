@@ -6,12 +6,14 @@ import { HeadphonesIcon, send, SEND_ERROR_EVENT } from "./controls";
 import { DevicesCard } from "./DevicesCard";
 import { EqCard } from "./EqCard";
 import { NoiseCard } from "./NoiseCard";
-import { audioDevices, type AppState, type EqPreset, type Snapshot } from "./types";
+import { UpdateBanner } from "./UpdateBanner";
+import { audioDevices, type AppState, type EqPreset, type Snapshot, type UpdateStatus } from "./types";
 
 export function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [presets, setPresets] = useState<EqPreset[]>([]);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [update, setUpdate] = useState<UpdateStatus>({ kind: "none" });
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,6 +32,11 @@ export function App() {
     unlisten.then(() => invoke<Snapshot | null>("get_state").then(apply));
     const onSendError = (e: Event) => setSendError((e as CustomEvent<string>).detail);
     window.addEventListener(SEND_ERROR_EVENT, onSendError);
+    // Updates: subscribe, then read the current status (same order as state).
+    const unlistenUpdate = listen<UpdateStatus>("update", (e) => !disposed && setUpdate(e.payload));
+    unlistenUpdate.then(() =>
+      invoke<UpdateStatus | null>("update_status").then((u) => !disposed && u && setUpdate(u)),
+    );
     // Presets live in a file the CLI can change too: re-read whenever the flyout shows.
     const loadPresets = () => invoke<EqPreset[] | null>("presets").then((p) => p && setPresets(p));
     loadPresets();
@@ -40,6 +47,7 @@ export function App() {
       disposed = true;
       unlisten.then((f) => f());
       window.removeEventListener(SEND_ERROR_EVENT, onSendError);
+      unlistenUpdate.then((f) => f());
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("focus", loadPresets);
     };
@@ -63,6 +71,7 @@ export function App() {
           presets={presets}
           onPresets={setPresets}
           sendError={sendError}
+          update={update}
           onDismissSendError={() => setSendError(null)}
         />
       ) : (
@@ -78,6 +87,7 @@ export function Flyout({
   onPresets = () => {},
   sendError = null,
   onDismissSendError = () => {},
+  update = { kind: "none" },
 }: {
   state: AppState;
   presets?: EqPreset[];
@@ -85,6 +95,7 @@ export function Flyout({
   /** A command the core refused (busy or stopped); shown before the core's own error. */
   sendError?: string | null;
   onDismissSendError?: () => void;
+  update?: UpdateStatus;
 }) {
   const error = sendError ?? state.error;
   const dismiss = () => (sendError ? onDismissSendError() : send({ type: "clearError" }));
@@ -92,6 +103,7 @@ export function Flyout({
   return (
     <>
       <Header state={state} />
+      <UpdateBanner status={update} />
       {error && (
         <div className="error" role="alert">
           <span>{error}</span>

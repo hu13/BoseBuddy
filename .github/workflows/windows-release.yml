@@ -1,22 +1,47 @@
 name: Windows release
 
-# Push a tag like qcbuddy-v0.1.0 (matching windows/app/src-tauri/tauri.conf.json)
-# to build the QC Buddy installer and attach it to a draft GitHub release.
-# Nothing is public until the draft is published by hand.
+# Merge a release/qcbuddy* PR into main, or push a tag like qcbuddy-v0.1.2
+# (matching windows/app/src-tauri/tauri.conf.json), to build the QCBuddy
+# installer, sign it for the updater, and attach it to a
+# draft GitHub release with latest-windows.json. Nothing is public, and no
+# installed copy is offered the update, until the draft is published by hand
+# (windows-publish-update.yml then updates the feed). The Microsoft Store
+# MSIX is a workflow artifact, uploaded to Partner Center by hand.
 
 on:
+  pull_request:
+    types: [closed]
+    branches: [main]
   push:
     tags: ["qcbuddy-v*"]
 
 permissions:
   contents: write
 
+# Same as windows.yml: no debug symbols in CI builds.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
 jobs:
   release:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'release/qcbuddy') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: windows-latest
+    env:
+      # The updater signing key (tauri signer generate). Installed copies only
+      # accept updates signed with it; keep an offline copy.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+        with:
+          # Do not pick up later commits that may already have landed on main.
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -27,14 +52,26 @@ jobs:
           workspaces: |
             windows/core
             windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
 
-      - name: Tag matches the app version
-        id: version
+      - name: Updater signing key is set
         shell: pwsh
         run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or -not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+            throw "Set the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets (see windows/RELEASING.md)."
+          }
+
+      - name: Validate versions and resolve the release tag
+        id: version
+        shell: pwsh
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
           $version = (Get-Content windows/app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
-          if ("${{ github.ref_name }}" -ne "qcbuddy-v$version") {
-            throw "Tag ${{ github.ref_name }} doesn't match tauri.conf.json version $version"
+          $tag = "qcbuddy-v$version"
+          if ($env:EVENT_NAME -eq "push" -and $env:REF_NAME -ne $tag) {
+            throw "Tag $env:REF_NAME doesn't match tauri.conf.json version $version"
           }
           foreach ($file in "windows/app/package.json") {
             $v = (Get-Content $file -Raw | ConvertFrom-Json).version
@@ -44,6 +81,12 @@ jobs:
             if (-not (Select-String -Path $file -Pattern "^version = `"$version`"" -Quiet)) { throw "$file isn't version $version" }
           }
           "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+
+      - name: Release notes from CHANGELOG.md
+        # Only this version's changes, plus the install footer. Fails here,
+        # before the build, if the changelog has no section for this version.
+        run: node windows/app/scripts/release-notes.mjs --version ${{ steps.version.outputs.version }} --changelog windows/CHANGELOG.md --repo ${{ github.repository }} --out release-notes.md
 
       - name: Core tests
         working-directory: windows/core
@@ -55,16 +98,80 @@ jobs:
           npm ci
           npm test
 
-      - name: Build the installer
+      - name: Build and sign the installer
         working-directory: windows/app
-        run: npm run tauri build
+        # tauri.release.conf.json adds createUpdaterArtifacts: the .sig file.
+        run: npx tauri build --config src-tauri/tauri.release.conf.json
+
+      - name: Package for the Microsoft Store
+        # The same build in an MSIX (the tray app only), which the Store
+        # signs. A workflow artifact only, uploaded to Partner Center by hand:
+        # MSIX isn't offered outside the Store. The identity is Partner
+        # Center's (QCBuddy → Product identity), in repository variables;
+        # without them it's a placeholder package for local testing only.
+        shell: pwsh
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          if (-not $env:MSIX_IDENTITY_NAME -or -not $env:MSIX_PUBLISHER -or -not $env:MSIX_PUBLISHER_DISPLAY_NAME) {
+            Write-Output "::warning::MSIX_* repository variables aren't set; the MSIX has a placeholder identity and can't go to the Store."
+            $env:MSIX_IDENTITY_NAME = "QCBuddy.Local"
+            $env:MSIX_PUBLISHER = "CN=QCBuddyLocal"
+            $env:MSIX_PUBLISHER_DISPLAY_NAME = "QCBuddy (local)"
+          }
+          windows/app/scripts/package-msix.ps1 `
+            -IdentityName $env:MSIX_IDENTITY_NAME `
+            -Publisher $env:MSIX_PUBLISHER `
+            -PublisherDisplayName $env:MSIX_PUBLISHER_DISPLAY_NAME `
+            -Out msix-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-msix-${{ steps.version.outputs.version }}
+          path: msix-dist/*.msix
+          if-no-files-found: error
+      - name: Tag the merged release commit
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        # GITHUB_TOKEN tag pushes do not trigger another workflow. Create the
+        # draft in this run instead of depending on a push event.
+        run: |
+          set -euo pipefail
+          git check-ref-format "refs/tags/$RELEASE_TAG"
+          git fetch --tags origin
+          commit="$(git rev-parse HEAD)"
+          if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            existing="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+            if [[ "$existing" != "$commit" ]]; then
+              printf 'Tag %s already points to a different commit; bump the app version.\n' "$RELEASE_TAG" >&2
+              exit 1
+            fi
+          else
+            git tag "$RELEASE_TAG" "$commit"
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
 
       - name: Name it and checksum it
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           $version = "${{ steps.version.outputs.version }}"
+          $built = "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${version}_x64-setup.exe"
+          $name = "QCBuddy_${version}_x64-setup.exe"
           New-Item -ItemType Directory dist | Out-Null
-          Copy-Item "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe"
+          Copy-Item $built "dist/$name"
+          Copy-Item "$built.sig" "dist/$name.sig"
+          # The update feed for this version; the publish workflow copies it to qcbuddy-latest.
+          node windows/app/scripts/update-feed.mjs `
+            --version $version `
+            --sig "dist/$name.sig" `
+            --url "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG/$name" `
+            --notes "QCBuddy $version. Release notes: https://github.com/${{ github.repository }}/releases/tag/$env:RELEASE_TAG" `
+            --out dist/latest-windows.json
           Push-Location dist
           Get-ChildItem *.exe | ForEach-Object {
             "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
@@ -76,10 +183,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
         run: |
           $version = "${{ steps.version.outputs.version }}"
-          gh release create "${{ github.ref_name }}" `
-            --draft --prerelease `
-            --title "QC Buddy $version (Windows)" `
-            --notes-file windows/RELEASE_NOTES.md `
-            "dist/QCBuddy_${version}_x64-setup.exe" dist/SHA256SUMS.txt
+          gh release create "$env:RELEASE_TAG" `
+            --verify-tag --draft --prerelease `
+            --title "QCBuddy $version (Windows)" `
+            --notes-file release-notes.md `
+            "dist/QCBuddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe.sig" `
+            dist/latest-windows.json dist/SHA256SUMS.txt

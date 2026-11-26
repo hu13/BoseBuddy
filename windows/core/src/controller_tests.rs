@@ -36,7 +36,7 @@ fn start_reads_everything() {
     assert!(s.peer(&peer_mac(1)).unwrap().active);
 
     let lines = log.lines();
-    assert!(lines.iter().any(|l| l.starts_with("session: QC Buddy ") && l.contains("Bose QC45 fw 4.0.4")));
+    assert!(lines.iter().any(|l| l.starts_with("session: QCBuddy ") && l.contains("Bose QC45 fw 4.0.4")));
     assert!(lines.iter().any(|l| l == "modes: Quiet, Aware, Walk; free slot 3"));
     // 2.3 is unsupported on a QC45: logged once in plain English.
     let charging: Vec<_> = lines.iter().filter(|l| l.contains("charging state")).collect();
@@ -573,7 +573,7 @@ fn a_channel_that_connects_but_never_answers_is_not_accepted() {
     assert!(matches!(c.state().link, LinkState::Failed(_)), "{:?}", c.state().link);
     let error = c.state().error.clone().unwrap();
     assert!(error.starts_with("The headphones didn't answer on channel 2, 9 (8 refused)."), "{error}");
-    assert!(error.contains("close QC Buddy or the qcbuddy CLI"), "{error}");
+    assert!(error.contains("close QCBuddy or the qcbuddy CLI"), "{error}");
     // Only the probe was sent: no reads on a channel that isn't BMAP.
     assert!(headset.state().request_log().is_empty());
 }
@@ -747,7 +747,7 @@ fn a_full_queue_says_busy_instead_of_piling_up() {
     assert!(results.iter().filter(|r| r.is_ok()).count() <= QUEUE_LIMIT);
     assert_eq!(
         SendError::Busy.to_string(),
-        "QC Buddy is still working on earlier changes. Try again in a moment."
+        "QCBuddy is still working on earlier changes. Try again in a moment."
     );
 }
 
@@ -788,7 +788,7 @@ fn a_crashing_command_is_reported_and_the_worker_carries_on() {
     wait_for(|| headset.state().mode_index == 1);
     drop(worker);
     let errors = errors.lock().unwrap();
-    assert!(errors.iter().any(|e| e.as_deref() == Some("Something went wrong in QC Buddy. The details are in the log; try again.")));
+    assert!(errors.iter().any(|e| e.as_deref() == Some("Something went wrong in QCBuddy. The details are in the log; try again.")));
     assert!(log.lines().iter().any(|l| l.starts_with("internal error in SetSidetone(2): simulated bug handling")));
 }
 

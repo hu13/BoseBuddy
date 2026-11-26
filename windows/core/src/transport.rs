@@ -39,7 +39,7 @@ pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(6);
 
 /// Open the first of `channels` that both connects and answers a BMAP
 /// request (0.1, protocol version). A channel can accept the connection and
-/// never answer, e.g. channel 9 while another QC Buddy holds channel 8.
+/// never answer, e.g. channel 9 while another QCBuddy holds channel 8.
 pub fn open_first_answering<F>(channels: &[u8], mut connect: F) -> Result<Box<dyn Transport>, BmapError>
 where
     F: FnMut(u8) -> Result<Box<dyn Transport>, BmapError>,
@@ -69,7 +69,7 @@ where
         let opened = channels.iter().filter(|c| !silent.contains(c)).copied().collect::<Vec<_>>();
         let busy = if opened.is_empty() { String::new() } else { format!(" ({} refused)", list(&opened)) };
         return Err(BmapError::Transport(format!(
-            "The headphones didn't answer on channel {}{busy}. Another app may be using them: close QC Buddy or the qcbuddy CLI elsewhere and try again.",
+            "The headphones didn't answer on channel {}{busy}. Another app may be using them: close QCBuddy or the qcbuddy CLI elsewhere and try again.",
             list(&silent)
         )));
     }

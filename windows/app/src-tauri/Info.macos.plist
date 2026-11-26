@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>QC Buddy uses Bluetooth to read your Bose headphones' battery and control noise cancellation, equalizer, and connected devices.</string>
+  <string>QCBuddy uses Bluetooth to read your Bose headphones' battery and control noise cancellation, equalizer, and connected devices.</string>
   <key>LSUIElement</key>
   <true/>
 </dict>

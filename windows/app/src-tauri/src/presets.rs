@@ -1,5 +1,5 @@
 //! The flyout's EQ preset commands. Every call re-reads the file, so presets
-//! saved by the CLI (or another QC Buddy) show up, and returns the full list
+//! saved by the CLI (or another QCBuddy) show up, and returns the full list
 //! for the flyout to render.
 
 use std::path::Path;

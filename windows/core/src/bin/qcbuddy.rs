@@ -1,4 +1,4 @@
-//! `qcbuddy`: QC Buddy's controller from the command line, for testing every
+//! `qcbuddy`: QCBuddy's controller from the command line, for testing every
 //! feature on the Windows PC without the tray UI. `--fake` runs against a
 //! simulated QC45 instead of Bluetooth.
 
@@ -15,7 +15,7 @@ use qcbuddy_core::platform::Platform;
 use qcbuddy_core::protocol::canonical_mac;
 
 const USAGE: &str = "\
-QC Buddy CLI: control a Bose headset over this PC's Bluetooth connection.
+QCBuddy CLI: control a Bose headset over this PC's Bluetooth connection.
 
 usage: qcbuddy [options] [command] [args]
 
@@ -43,6 +43,9 @@ commands:
   power-off
   watch [SECONDS]            act like an open flyout: poll every 15 s, print changes
   log                        log file location and its last 40 lines
+  update [--install]         is there a newer QCBuddy? (--install: the tray app
+                             checks and offers Install and restart; the Store
+                             copy opens its Store page)
 
 options:
   --fake                     use a simulated QC45 instead of Bluetooth
@@ -95,6 +98,16 @@ fn main() -> ExitCode {
     }
     if o.command == "log" {
         return show_log(o.fake);
+    }
+    if matches!(o.command.as_str(), "update" | "check-update" | "check-updates")
+        || (o.command == "check" && o.args.first().is_some_and(|a| a.starts_with("update")))
+    {
+        return update(o.args.iter().any(|a| a == "--install"));
+    }
+    // Reject typos before spending seconds connecting to the headset.
+    if !HEADSET_COMMANDS.contains(&o.command.as_str()) && o.command != "devices" {
+        eprintln!("unknown command \"{}\" (see --help)", o.command);
+        return ExitCode::from(2);
     }
 
     let log_path = if o.fake { data_dir().join("QCBuddy-fake.log") } else { default_path() };
@@ -181,6 +194,82 @@ fn connect(c: &mut Controller, address: Option<&str>) {
             c.connect(Some(&first));
         }
     }
+}
+
+/// Commands that talk to the headset (everything `run` handles).
+const HEADSET_COMMANDS: &[&str] = &[
+    "status", "mode", "mode-edit", "custom", "eq", "eq-band", "preset", "preset-save", "preset-rename",
+    "preset-delete", "sidetone", "multipoint", "peers", "connect", "disconnect", "pc-audio", "pairing",
+    "power-off", "watch",
+];
+
+/// `qcb update`: read the feed installed copies read and say whether there's
+/// a newer QCBuddy. Uses Windows' own curl.exe, so the CLI needs no HTTPS
+/// code of its own. With --install, the tray app checks and offers it.
+fn update(install: bool) -> ExitCode {
+    use qcbuddy_core::update_feed::{feed_version, verdict, Verdict, CURRENT_VERSION, WINDOWS_FEED_URL};
+    // The Store copy updates through the Store, which may not have the
+    // latest GitHub release yet: don't compare it with the GitHub feed.
+    if qcbuddy_core::package::is_packaged() {
+        println!("This is QCBuddy {CURRENT_VERSION} from the Microsoft Store, which keeps it up to date.");
+        if install {
+            if qcbuddy_core::package::open_store_page() {
+                println!("Opened QCBuddy's Store page.");
+            } else {
+                eprintln!("Couldn't open the Microsoft Store.");
+                return ExitCode::FAILURE;
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+    let fetched = std::process::Command::new("curl.exe")
+        .args(["--silent", "--show-error", "--fail", "--location", "--max-time", "15", WINDOWS_FEED_URL])
+        .output();
+    let feed = match fetched {
+        Err(e) => {
+            eprintln!("Couldn't check for updates: curl.exe isn't available ({e}).");
+            return ExitCode::FAILURE;
+        }
+        Ok(out) if !out.status.success() => {
+            let reason = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            if reason.contains("404") {
+                println!("No QCBuddy update has been published yet (this is {CURRENT_VERSION}).");
+                return ExitCode::SUCCESS;
+            }
+            eprintln!("Couldn't check for updates: {reason}");
+            return ExitCode::FAILURE;
+        }
+        Ok(out) => String::from_utf8_lossy(&out.stdout).into_owned(),
+    };
+    let latest = match feed_version(&feed) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Couldn't check for updates: {e}.");
+            return ExitCode::FAILURE;
+        }
+    };
+    match verdict(CURRENT_VERSION, &latest) {
+        Verdict::UpToDate => println!("QCBuddy {CURRENT_VERSION} is up to date."),
+        Verdict::Ahead(v) => println!("This is QCBuddy {CURRENT_VERSION}, newer than the published {v}."),
+        Verdict::Newer(v) => {
+            println!("QCBuddy {v} is available (this is {CURRENT_VERSION}).");
+            if !install {
+                println!("Run `qcb update --install`, or right-click the tray icon → Check for updates.");
+            }
+        }
+    }
+    if install {
+        // The tray app holds the updater (and its signature check): let it offer the update.
+        let app = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("QCBuddy.exe")));
+        match app.filter(|p| p.exists()) {
+            Some(app) => match std::process::Command::new(&app).arg("--check-for-updates").spawn() {
+                Ok(_) => println!("Opened QCBuddy to check and install: click \"Install and restart\" in its flyout."),
+                Err(e) => eprintln!("Couldn't start {}: {e}", app.display()),
+            },
+            None => println!("QCBuddy (QCBuddy.exe) isn't installed next to qcb; install it from the releases page."),
+        }
+    }
+    ExitCode::SUCCESS
 }
 
 fn run(c: &mut Controller, presets: &mut EqPresetStore, command: &str, args: &[String]) -> Result<(), String> {
@@ -534,6 +623,24 @@ mod tests {
         let store = EqPresetStore::in_memory();
         assert_eq!(find_preset(&store, " WARM ").unwrap().values, [4, 0, -3]);
         assert!(find_preset(&store, "beebeebop").is_err());
+    }
+
+    #[test]
+    fn every_headset_command_is_known_before_connecting() {
+        // If `run` handles a command, HEADSET_COMMANDS must list it, or the
+        // CLI would reject it as a typo without connecting.
+        let headset = FakeHeadset::default();
+        let mut c = Controller::new(Box::new(headset), Log::memory());
+        c.start();
+        let mut presets = EqPresetStore::in_memory();
+        let err = run(&mut c, &mut presets, "frobnicate", &[]).unwrap_err();
+        assert!(err.starts_with("unknown command"));
+        // `watch` polls forever; it is matched in `run` like the rest.
+        for command in HEADSET_COMMANDS.iter().filter(|c| **c != "watch") {
+            if let Err(e) = run(&mut c, &mut presets, command, &[]) {
+                assert!(!e.starts_with("unknown command"), "{command} isn't handled by run");
+            }
+        }
     }
 
     #[test]

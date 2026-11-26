@@ -1,17 +1,17 @@
-# QC Buddy — Windows port plan
+# QCBuddy — Windows port plan
 
 Status: M0–M2 done; M3 and M4 built (hardware checks pending); M6 release pipeline built (M5 polish deferred). Tray app in `windows/app`. Branch `feature/windows-port`.
 
 ## Goal
 
-**QC Buddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
+**QCBuddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
 same features. It controls a Bose headset over the PC's existing Bluetooth
 connection, with no phone app, account or cloud. Same look as the mockup
 (<https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy>; static copy and
 screenshot in [`docs/`](docs/)): a flyout above the tray icon with Devices,
 Noise control and Equalizer cards.
 
-![QC Buddy tray flyout mockup](docs/mockup.png)
+![QCBuddy tray flyout mockup](docs/mockup.png)
 
 ### Parity scope (v1)
 
@@ -118,7 +118,7 @@ captured test fixtures. The macOS app is unchanged.
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. Built (UI + core; presets shared with the CLI in `eq-presets.json`); editing still to be checked on hardware. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
-| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a pre-release from a `qcbuddy-v<version>` tag (version check, tests, installer, SHA-256); `RELEASE_NOTES.md`; README section. Auto-updater not yet. |
+| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a signed pre-release from a `qcbuddy-v<version>` tag; auto-update from 0.1.2 (feed per platform, published by `windows-publish-update.yml`); see [`RELEASING.md`](RELEASING.md). |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
 
 ## M0 checklist
@@ -229,9 +229,12 @@ Findings:
   notes and README explain SmartScreen's "Windows protected your PC" screen
   (More info → Run anyway). Revisit with Azure Trusted Signing if the warning
   hurts adoption.
-- **Updates:** Tauri updater plugin, reading a `latest.json` attached to the
-  GitHub release. It needs its own update-signing key (separate from code
-  signing); keep the private key out of the repo, in a GitHub Actions secret.
+- **Updates (from 0.1.2):** Tauri updater plugin. Installed copies read
+  `qcbuddy-latest/latest-{{target}}.json` (one feed per platform, so a
+  future macOS build can release separately); the feed is updated only when
+  a release is published. Updates are signed with QCBuddy's own key (not
+  code signing), kept out of the repo in GitHub secrets. See
+  [`RELEASING.md`](RELEASING.md).
 - **Launch at login:** Tauri `autostart` plugin (registry Run key), fine
   outside MSIX.
 - **Third-party notices:** credit bosectl (MIT) for the QC45 mode layout in
@@ -243,13 +246,21 @@ Findings:
   SmartScreen warning and get automatic updates through the Store.
 - **Tauri doesn't build MSIX**; package the release build with Microsoft's MSIX
   tooling (`makeappx` / MSIX Packaging Tool) in CI.
+  *Done:* `app/msix/AppxManifest.xml` + `app/scripts/package-msix.ps1`;
+  `windows-release.yml` uploads the `.msix` as a workflow artifact. The
+  Store copy detects its package at runtime (`core/src/package.rs`), so
+  there's one build for both channels. See [`RELEASING.md`](RELEASING.md).
 - **MSIX changes the app:**
   - Launch at login becomes a declared `StartupTask` instead of the registry
     Run key (the Run key is virtualized inside MSIX).
-  - File writes under AppData are redirected, so read the log path from the
-    API at runtime rather than hard-coding it.
-  - Turn off the Tauri updater in the Store build; the Store updates the app.
-- **Listing:** "QC Buddy — works with Bose QuietComfort headphones", no Bose
+  - File writes under AppData are redirected to the package's LocalCache.
+    The app sees the redirected folder, so the hard-coded
+    `%LOCALAPPDATA%\QC Buddy` path keeps working.
+  - The Tauri updater is off in the Store copy; the Store updates the app.
+  - No CLI: an app execution alias needs a second, hidden app
+    (`AppListEntry="none"`), which the Store refuses without a
+    HeadlessAppBypass waiver. `qcb` stays in the GitHub installer.
+- **Listing:** "QCBuddy — works with Bose QuietComfort headphones", no Bose
   logos or artwork; needs a Microsoft developer account, privacy statement
   (no telemetry, logs stay local) and screenshots.
 - Check Microsoft's current Store, signing and account requirements before
@@ -260,12 +271,19 @@ release), standalone MSIX outside the Store.
 
 ## Name
 
-**QC Buddy** (decided 2026-11-25).
+**QCBuddy** (decided 2026-11-25 as "QC Buddy"; renamed to "QCBuddy" the same
+day, the name reserved in Partner Center, which the Store requires as the
+package's display name).
 
-- Product name "QC Buddy", executable `QCBuddy.exe`, bundle identifier
-  `com.qcbuddy.app`, install folder and log folder `QC Buddy`.
+- Display name "QCBuddy", executable `QCBuddy.exe`, bundle identifier
+  `com.qcbuddy.app`.
+- Tauri's `productName`, the install folder and the log folder stay
+  `QC Buddy`: the NSIS installer keys its install folder and uninstall entry
+  on `productName`, so changing it would make updates install a second copy
+  beside the first, and moving the log folder would orphan existing EQ
+  presets. The GitHub installer's Start menu shortcut is still "QC Buddy".
 - Avoids "Bose" in the name, which keeps the Microsoft Store open as an
   option. Descriptions still say it works with Bose QuietComfort headphones
   (factual compatibility), with no Bose logos or artwork.
-- The macOS app stays BoseBuddy. The README and bosebuddy.com link to QC Buddy
+- The macOS app stays BoseBuddy. The README and bosebuddy.com link to QCBuddy
   as the Windows version.
