@@ -1,4 +1,4 @@
-.PHONY: build run selftest install install-dev package msix clean
+.PHONY: build run selftest install install-dev package msix msix-install clean
 
 build:
 	./build.sh
@@ -44,6 +44,13 @@ package:
 # windows/app/src-tauri/target/msix. See windows/RELEASING.md.
 msix:
 	powershell -NoProfile -ExecutionPolicy Bypass -File windows/app/scripts/package-msix.ps1 -Build
+
+# Windows only: build the MSIX, then install it unsigned on this PC by
+# registering its staged folder (needs Developer Mode; double-clicking the
+# unsigned .msix fails with 0x800B010A). Uninstall the GitHub copy first, or
+# both run side by side with separate settings.
+msix-install: msix
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "Add-AppxPackage -Register '$(CURDIR)/windows/app/src-tauri/target/msix/msix/AppxManifest.xml' -ForceApplicationShutdown -ForceUpdateFromAnyVersion"
 
 clean:
 	rm -rf dist
