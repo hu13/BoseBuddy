@@ -40,7 +40,7 @@
     </Application>
 
     <!-- The command-line tool: `qcb` on PATH, not in the Start menu. -->
-    <Application Id="qcb" Executable="qcb.exe" EntryPoint="Windows.FullTrustApplication">
+    <Application Id="qcb" Executable="qcb.exe" EntryPoint="Windows.FullTrustApplication" desktop4:SupportsMultipleInstances="true">
       <uap:VisualElements
         DisplayName="qcb"
         Description="QC Buddy's command-line tool."
