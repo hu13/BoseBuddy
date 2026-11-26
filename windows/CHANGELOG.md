@@ -1,7 +1,17 @@
 # QCBuddy changelog
 
-What changed in each QCBuddy (Windows) release, newest first. The release
+What changed in each QCBuddy release, newest first. The release
 page for a version shows its section from this file.
+
+## 0.1.4
+
+- **QCBuddy for macOS.** A universal DMG (Apple silicon and Intel) of the
+  same app, released alongside the Windows installer. It runs in the menu
+  bar and reads the headphones through macOS Bluetooth. It doesn't update
+  itself yet.
+- The name is now shown as **QCBuddy** everywhere: the tray tooltip and
+  menu, the flyout, the command-line tool and error messages. The install
+  folder and your EQ presets stay where they were.
 
 ## 0.1.3
 
