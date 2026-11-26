@@ -179,14 +179,14 @@ impl Controller {
         }
         let Some(local) = self.state.peers.iter().find(|p| p.is_local).cloned() else {
             if !automatic {
-                self.set_error("Couldn't find this PC in the headphones' paired-device list.");
+                self.set_error(format!("Couldn't find {} in the headphones' paired-device list.", crate::platform::this_computer()));
                 self.end();
             }
             return;
         };
         let holding = self.state.peers.iter().filter(|p| peers::holds_audio_slot(p, false)).count();
         self.log.write(format!("connectPCAudio {}; connected={holding}/2", local.mac));
-        self.state.action_note = Some("Connecting this PC…".into());
+        self.state.action_note = Some(format!("Connecting {}…", crate::platform::this_computer()));
         self.changed();
         let mut payload = vec![0u8];
         payload.extend(mac_bytes(&local.mac));
@@ -206,9 +206,9 @@ impl Controller {
             self.read_source();
             self.load_peers();
         } else {
-            self.log.write("CONNECT self did not produce a Windows audio device");
+            self.log.write("CONNECT self did not produce a system audio device");
             if !automatic {
-                self.set_error("Windows still isn't offering the headphones as an output. Connect them in Settings → Bluetooth & devices, then try again.");
+                self.set_error(crate::platform::audio_settings_help());
             }
         }
         if !automatic {
@@ -227,7 +227,7 @@ impl Controller {
             self.end();
             return;
         };
-        self.state.action_note = Some("Disconnecting this PC…".into());
+        self.state.action_note = Some(format!("Disconnecting {}…", crate::platform::this_computer()));
         self.changed();
         let _ = self.exchange(4, 2, Op::Start, &mac_bytes(&local.mac), false, false, Duration::from_secs(2));
         for _ in 0..12 {
@@ -240,7 +240,7 @@ impl Controller {
         self.state.action_note = None;
         self.load_peers();
         if self.state.pc_audio {
-            self.set_error("Couldn't disconnect this PC's audio. Try the Bluetooth button on the headphones.");
+            self.set_error(format!("Couldn't disconnect {}'s audio. Try the Bluetooth button on the headphones.", crate::platform::this_computer()));
         }
         self.end();
     }

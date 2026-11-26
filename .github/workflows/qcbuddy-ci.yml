@@ -1,9 +1,9 @@
-name: Windows
+name: QCBuddy CI
 
 # Pull requests only (and by hand); pushes don't build.
 on:
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
+    paths: ["windows/**", ".github/workflows/qcbuddy-ci.yml", ".github/workflows/qcbuddy-release.yml", ".github/workflows/macos-release.yml"]
   workflow_dispatch:
 
 env:
@@ -14,6 +14,7 @@ env:
 
 jobs:
   core:
+    name: QCBuddy core
     # Runners have no Bluetooth: this builds and runs the unit tests, which use
     # the simulated headset. Hardware checks happen on the Windows test PC.
     runs-on: windows-latest
@@ -32,7 +33,7 @@ jobs:
           # save again on an exact hit. Without the workflows in the key, a
           # cache saved by older steps (the first app run saved clippy-only
           # metadata) is restored forever while every run rebuilds everything.
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/qcbuddy-ci.yml', '.github/workflows/qcbuddy-release.yml') }}
       - run: cargo test
       - run: cargo clippy --all-targets -- -D warnings
       - name: CLI smoke test (simulated headset)
@@ -48,6 +49,7 @@ jobs:
           ../app/scripts/package-msix.ps1 -IdentityName QCBuddy.Local -Publisher "CN=QCBuddyLocal" -PublisherDisplayName "QCBuddy (local)" -Out ../../msix-check
 
   app:
+    name: QCBuddy app
     # UI tests (render from core/src/ui_fixtures.rs fixtures), type check,
     # and the Tauri app's build and tests (no installer).
     runs-on: windows-latest
@@ -67,7 +69,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/app/src-tauri
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/qcbuddy-ci.yml', '.github/workflows/qcbuddy-release.yml') }}
       - run: npm ci
       - run: npm test
       - run: npm run build
@@ -75,3 +77,42 @@ jobs:
         working-directory: windows/app/src-tauri
       - run: cargo clippy -- -D warnings
         working-directory: windows/app/src-tauri
+
+  macos:
+    # The macOS build of core (IOBluetooth bridge in core/native/macos.m) and
+    # the Tauri shell. The Windows jobs don't compile that code, so without
+    # this a Mac-only break would first show up in the release's DMG job.
+    name: QCBuddy macOS
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/qcbuddy-ci.yml') }}
+      - name: Core tests
+        working-directory: windows/core
+        run: |
+          cargo test
+          cargo clippy --all-targets -- -D warnings
+      - name: Frontend build
+        # src-tauri embeds app/dist, so it must exist before cargo builds it.
+        working-directory: windows/app
+        run: |
+          npm ci
+          npm run build
+      - name: Tauri app tests
+        working-directory: windows/app/src-tauri
+        run: |
+          cargo test
+          cargo clippy -- -D warnings

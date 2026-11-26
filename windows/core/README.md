@@ -6,6 +6,18 @@ The tray app (M2) depends on it. It also builds the **`qcbuddy` CLI**, which
 runs every feature from a terminal, so the hardware can be tested without the
 UI.
 
+On macOS, `MacPlatform` uses the same IOBluetooth and CoreAudio frameworks
+as the Swift app. `src/macos.rs` keeps discovery filtering and BMAP exchange
+logic in Rust; `native/macos.m` exposes the native APIs through a C ABI.
+Each RFCOMM connection owns a run-loop thread that also closes and releases
+its native objects. Connection attempts have a six-second deadline; replies
+use the controller's timeout and GetAll drains until 300 ms of inactivity.
+Closing the control channel leaves the audio/baseband connection intact.
+
+Build the macOS app using [the app instructions](../app/README.md#macos-build).
+Quit other Bose controller apps before testing the real headset. macOS logs
+and presets are in `~/Library/Application Support/QC Buddy`.
+
 ## CLI
 
 ```powershell

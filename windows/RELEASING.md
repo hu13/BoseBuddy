@@ -28,12 +28,17 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
    The release page shows that section plus a short install footer
    (`app/scripts/release-notes.mjs`); the release fails early if the section
    is missing.
-2. Merge the PR. `windows-release.yml` checks the versions, runs the tests,
-   builds and signs the installer, tags the exact merge commit as
-   `qcbuddy-vX.Y.Z`, and creates a **draft** pre-release with:
-   - `QCBuddy_X.Y.Z_x64-setup.exe` and its `.sig`
-   - `latest-windows.json` (the update feed entry for this version)
-   - `SHA256SUMS.txt`
+2. Merge the PR. `qcbuddy-release.yml` checks the versions and the
+   changelog, then releases each platform independently, side by side:
+   - **Windows** (tests, signed installer, MSIX): tags the exact merge
+     commit as `qcbuddy-vX.Y.Z` and creates a **draft** pre-release with
+     `QCBuddy_X.Y.Z_x64-setup.exe` and its `.sig`, `latest-windows.json`
+     (the update feed entry for this version) and `SHA256SUMS.txt`.
+   - **macOS** (tests, universal DMG): tags the same commit as
+     `qcbuddy-macos-vX.Y.Z` and creates its own draft with
+     `QCBuddy_X.Y.Z_universal.dmg` and `SHA256SUMS.txt` (see macOS DMG).
+   If one platform fails, the other still gets its draft; fix the cause and
+   **Re-run failed jobs**.
    The tag version comes from `tauri.conf.json`, not the branch name.
    Closed-but-unmerged PRs and other source branches do not release.
    An existing tag is never moved: it must point to the same commit or
@@ -105,7 +110,7 @@ the app and packages it with QCBuddy's identity, in
 **Each release**, after step 2 above:
 
 1. Download `QCBuddy_X.Y.Z.0_x64.msix` from the release run's artifacts
-   (Actions → Windows release → `qcbuddy-msix-X.Y.Z`).
+   (Actions → QCBuddy release → `qcbuddy-msix-X.Y.Z`).
 2. Check it on the test PC (`HARDWARE-CHECKLIST.md`) by installing the
    unsigned package from the run: unzip the `.msix` (it's a zip) and, with
    Developer Mode on, `Add-AppxPackage -Register <folder>\AppxManifest.xml`.
@@ -123,3 +128,32 @@ than the last; a rejected submission needs a version bump.
 **Package locations:** the Store copy's log and presets are under
 `%LOCALAPPDATA%\Packages\<package family name>\LocalCache\Local\QC Buddy`
 (Windows redirects the app's `%LOCALAPPDATA%\QC Buddy`).
+
+## macOS DMG
+
+`macos-release.yml` builds the Tauri app for macOS as a universal (Apple
+silicon and Intel) `QCBuddy_X.Y.Z_universal.dmg`. `qcbuddy-release.yml` runs
+it alongside the Windows build; it tags the commit `qcbuddy-macos-vX.Y.Z`
+and creates a separate draft, "QCBuddy X.Y.Z (macOS)", which is checked and
+published on its own. Publishing it doesn't touch the Windows update feed
+(`windows-publish-update.yml` only acts on `qcbuddy-v*` releases). Actions →
+**macOS release** → Run workflow builds a test DMG from any branch (artifact
+only), or, with a `qcbuddy-macos-vX.Y.Z` tag, rebuilds that tag and replaces
+the files on its release.
+
+The macOS copy doesn't read the update feed yet (there's no
+`latest-darwin.json`); users download each new DMG by hand.
+
+**Signing (optional):** without these secrets the app is ad-hoc signed, and
+Gatekeeper blocks its first launch until it's allowed under System Settings
+→ Privacy & Security. With them, Tauri signs it with a Developer ID and
+notarizes it:
+
+```sh
+base64 -i DeveloperID.p12 | gh secret set APPLE_CERTIFICATE --repo hu13/BoseBuddy
+gh secret set APPLE_CERTIFICATE_PASSWORD --repo hu13/BoseBuddy      # the .p12's password
+gh secret set APPLE_SIGNING_IDENTITY --repo hu13/BoseBuddy          # "Developer ID Application: Name (TEAMID)"
+gh secret set APPLE_ID --repo hu13/BoseBuddy                        # notarization
+gh secret set APPLE_PASSWORD --repo hu13/BoseBuddy                  # an app-specific password
+gh secret set APPLE_TEAM_ID --repo hu13/BoseBuddy
+```

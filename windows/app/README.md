@@ -36,6 +36,29 @@ the app again opens the running one's flyout.
 
 The log is the same as the CLI's: `%LOCALAPPDATA%\QC Buddy\QCBuddy.log`.
 
+## macOS build
+
+The Tauri app can also be built on macOS with Rust, Node and Xcode
+Command Line Tools installed:
+
+```sh
+cd windows/app
+npm ci
+npm run tauri build -- --bundles app
+open "src-tauri/target/release/bundle/macos/QC Buddy.app"
+```
+
+This builds for the Mac's host architecture. The macOS configuration uses
+the `.icns` icon, a menu-bar-only app and a Bluetooth permission description.
+This is a local build, not a signed and notarized distribution build.
+
+Pair and connect the headphones in macOS Bluetooth settings, then launch
+the app and allow Bluetooth access. The Rust core uses Apple's IOBluetooth
+and CoreAudio frameworks through a small Objective-C bridge, following the
+original Swift app. The flyout opens below the menu bar at the right edge.
+Logs and presets live in `~/Library/Application Support/QC Buddy`.
+For simulation, run `QCBUDDY_FAKE=1 npm run tauri dev`.
+
 ## Tests
 
 ```powershell

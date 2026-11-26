@@ -1,8 +1,17 @@
-name: Build
+name: build_swift
 
 # Pull requests only (and by hand); pushes don't build.
 on:
   pull_request:
+    # The Swift app only; QCBuddy (windows/) has its own checks in qcbuddy-ci.yml.
+    paths:
+      - "Sources/**"
+      - "Resources/**"
+      - "Tests/**"
+      - "build.sh"
+      - "package.sh"
+      - "Makefile"
+      - ".github/workflows/build_swift.yml"
   workflow_dispatch:
 
 jobs:

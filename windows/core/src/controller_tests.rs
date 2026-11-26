@@ -241,8 +241,8 @@ fn pc_audio_that_never_appears_is_reported() {
     let (mut c, _, log) = connected(fake);
     c.connect_pc_audio(false);
     assert!(!c.state().pc_audio);
-    assert!(c.state().error.as_deref().unwrap().starts_with("Windows still isn't offering"));
-    assert!(log.lines().contains(&"CONNECT self did not produce a Windows audio device".to_string()));
+    assert_eq!(c.state().error.as_deref(), Some(crate::platform::audio_settings_help()));
+    assert!(log.lines().contains(&"CONNECT self did not produce a system audio device".to_string()));
 }
 
 #[test]
@@ -809,7 +809,7 @@ fn an_unreachable_headset_fails_after_one_channel_not_three() {
     assert_eq!(headset.state().connect_attempts, [8], "no point trying 2 and 9");
     assert_eq!(
         c.state().error.as_deref(),
-        Some("The headphones didn't respond within 6 s. Make sure they're on, nearby and connected to this PC.")
+        Some(format!("The headphones didn't respond within 6 s. Make sure they're on, nearby and connected to {}.", crate::platform::this_computer()).as_str())
     );
 }
 

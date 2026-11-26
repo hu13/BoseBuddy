@@ -73,7 +73,9 @@ impl Peer {
 
     pub fn status_text(&self) -> &'static str {
         match (self.is_local, self.connected, self.active) {
+            (true, _, true) if cfg!(target_os = "macos") => "This Mac · Audio",
             (true, _, true) => "This PC · Audio",
+            (true, _, false) if cfg!(target_os = "macos") => "This Mac",
             (true, _, false) => "This PC",
             (false, true, true) => "Connected · Audio",
             (false, true, false) => "Connected",

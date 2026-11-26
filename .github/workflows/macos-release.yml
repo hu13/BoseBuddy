@@ -1,0 +1,184 @@
+name: macOS release
+
+# Builds the QCBuddy Tauri app for macOS (universal: Apple silicon and Intel)
+# as a .dmg installer.
+#
+# - qcbuddy-release.yml calls it with release: true, independently of the
+#   Windows build: it tags the commit qcbuddy-macos-vX.Y.Z and creates the
+#   macOS draft release (DMG, SHA256SUMS.txt). Windows has its own tag
+#   (qcbuddy-vX.Y.Z) and draft, so either platform can fail, be re-run or be
+#   published without the other.
+# - Run it by hand (Actions → Run workflow) with no tag for a test DMG, a
+#   workflow artifact only; with a tag like qcbuddy-macos-v0.1.3 it rebuilds
+#   that tag and replaces the files on its release.
+#
+# Signing: with the APPLE_CERTIFICATE secrets set, the app is signed with that
+# Developer ID, and with the APPLE_ID secrets too it's notarized. Without
+# them the app is ad-hoc signed: it runs, but Gatekeeper blocks the first
+# launch until it's allowed in System Settings → Privacy & Security.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit to build"
+        type: string
+        required: true
+      release:
+        description: "Tag the commit qcbuddy-macos-vX.Y.Z and create its draft release"
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release to rebuild and replace the files of, e.g. qcbuddy-macos-v0.1.3 (blank: this branch, artifact only)"
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  dmg:
+    runs-on: macos-15
+    env:
+      TAG: ${{ inputs.tag }}
+      RELEASE: ${{ inputs.release }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.ref || inputs.tag || github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/macos-release.yml') }}
+
+      - name: Validate the version and resolve the release tag
+        id: version
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version windows/app/src-tauri/tauri.conf.json)"
+          tag="qcbuddy-macos-v$version"
+          if [[ -n "$TAG" && "$TAG" != "$tag" ]]; then
+            echo "::error::Tag $TAG doesn't match tauri.conf.json version $version (expected $tag)"; exit 1
+          fi
+          release=false
+          if [[ "$RELEASE" == true || -n "$TAG" ]]; then
+            release=true
+            # An existing tag is never moved: it must already point here.
+            git fetch --tags origin
+            if git show-ref --verify --quiet "refs/tags/$tag" &&
+               [[ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo "::error::Tag $tag already points to a different commit; bump the app version."; exit 1
+            fi
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Core tests
+        working-directory: windows/core
+        run: cargo test
+
+      - name: App tests
+        working-directory: windows/app
+        run: |
+          npm ci
+          npm test
+          (cd src-tauri && cargo test)
+
+      - name: Signing identity
+        # Only export what's set: Tauri treats an empty APPLE_CERTIFICATE as
+        # a certificate to import.
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # GITHUB_ENV takes one line per variable: drop the line breaks that
+          # GNU base64 (and some secret pastes) wrap the certificate with.
+          APPLE_CERTIFICATE="$(printf '%s' "$APPLE_CERTIFICATE" | tr -d '\r\n ')"
+          if [[ -n "$APPLE_CERTIFICATE" && -n "$APPLE_SIGNING_IDENTITY" ]]; then
+            {
+              echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
+              echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERTIFICATE_PASSWORD"
+              echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY"
+            } >> "$GITHUB_ENV"
+            if [[ -n "$APPLE_ID" && -n "$APPLE_PASSWORD" && -n "$APPLE_TEAM_ID" ]]; then
+              {
+                echo "APPLE_ID=$APPLE_ID"
+                echo "APPLE_PASSWORD=$APPLE_PASSWORD"
+                echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+              } >> "$GITHUB_ENV"
+              echo "Signing with $APPLE_SIGNING_IDENTITY and notarizing."
+            else
+              echo "::warning::APPLE_ID, APPLE_PASSWORD or APPLE_TEAM_ID isn't set; the app is signed but not notarized."
+            fi
+          else
+            echo "APPLE_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+            echo "::warning::APPLE_CERTIFICATE secrets aren't set; the app is ad-hoc signed and Gatekeeper will block its first launch."
+          fi
+
+      - name: Build the DMG
+        working-directory: windows/app
+        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+
+      - name: Name it and checksum it
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir dist
+          built="windows/app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/QC Buddy_${VERSION}_universal.dmg"
+          cp "$built" "dist/QCBuddy_${VERSION}_universal.dmg"
+          (cd dist && shasum -a 256 *.dmg | tee SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-macos-${{ steps.version.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Tag and draft the macOS release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node windows/app/scripts/release-notes.mjs --version "$VERSION" --changelog windows/CHANGELOG.md --repo "$REPO" --platform macos --out release-notes.md
+          # GITHUB_TOKEN tag pushes don't trigger other workflows.
+          if ! git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            git tag "$RELEASE_TAG" HEAD
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            # A re-run, or a rebuild by hand: replace the files.
+            gh release upload "$RELEASE_TAG" dist/* --repo "$REPO" --clobber
+          else
+            gh release create "$RELEASE_TAG" --repo "$REPO" \
+              --verify-tag --draft --prerelease \
+              --title "QCBuddy $VERSION (macOS)" \
+              --notes-file release-notes.md \
+              dist/*
+          fi

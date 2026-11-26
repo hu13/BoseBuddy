@@ -1,3 +1,4 @@
+import { localComputer } from "./platform";
 // Mirrors qcbuddy-core's `State` (serde camelCase) and `Command`.
 
 export type LinkState =
@@ -144,12 +145,12 @@ export function holdsAudio(peer: Peer, state: AppState): boolean {
 export function audioDevices(state: AppState): string {
   return state.peers
     .filter((p) => holdsAudio(p, state))
-    .map((p) => (p.isLocal ? "PC" : displayName(p)))
+    .map((p) => (p.isLocal ? localComputer().short : displayName(p)))
     .join(" + ");
 }
 
 export function displayName(peer: Peer): string {
-  return peer.isLocal ? "This PC" : peer.name || peer.mac;
+  return peer.isLocal ? localComputer().name : peer.name || peer.mac;
 }
 
 export type PeerKind = "computer" | "phone" | "tablet" | "headphones";

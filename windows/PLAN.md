@@ -118,7 +118,7 @@ captured test fixtures. The macOS app is unchanged.
 | M3 | Devices | Paired list, connect / disconnect / switch, auto-drop, multipoint, pairing mode. Built (UI + core); switching devices still to be checked on hardware. |
 | M4 | Noise + EQ | Mode editing, "+ Custom", EQ presets incl. custom names, sidetone. Built (UI + core; presets shared with the CLI in `eq-presets.json`); editing still to be checked on hardware. |
 | M5 | Polish | Onboarding, autostart, settings, logging parity, light/dark. |
-| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `windows-release.yml` drafts a signed pre-release from a `qcbuddy-v<version>` tag; auto-update from 0.1.2 (feed per platform, published by `windows-publish-update.yml`); see [`RELEASING.md`](RELEASING.md). |
+| M6 | Ship on GitHub Releases | NSIS `.exe` installer published on a GitHub release with SmartScreen instructions and a README section (see Distribution). Built: `qcbuddy-release.yml` drafts a signed pre-release from a `qcbuddy-v<version>` tag; auto-update from 0.1.2 (feed per platform, published by `windows-publish-update.yml`); see [`RELEASING.md`](RELEASING.md). |
 | M7 | Microsoft Store (follow-up) | MSIX package accepted in the Store after v1 is stable (see Distribution). |
 
 ## M0 checklist
@@ -247,7 +247,7 @@ Findings:
 - **Tauri doesn't build MSIX**; package the release build with Microsoft's MSIX
   tooling (`makeappx` / MSIX Packaging Tool) in CI.
   *Done:* `app/msix/AppxManifest.xml` + `app/scripts/package-msix.ps1`;
-  `windows-release.yml` uploads the `.msix` as a workflow artifact. The
+  `qcbuddy-release.yml` uploads the `.msix` as a workflow artifact. The
   Store copy detects its package at runtime (`core/src/package.rs`), so
   there's one build for both channels. See [`RELEASING.md`](RELEASING.md).
 - **MSIX changes the app:**

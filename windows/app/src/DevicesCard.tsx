@@ -1,3 +1,4 @@
+import { localComputer } from "./platform";
 import { DeviceIcon, send, Toggle } from "./controls";
 import { displayName, holdsAudio, peerKind, type AppState, type Peer } from "./types";
 
@@ -64,7 +65,7 @@ function PeerRow({ peer, state, full, working }: { peer: Peer; state: AppState; 
 
   let status: string;
   if (busy) status = state.actionNote ?? "Working…";
-  else if (peer.isLocal) status = state.pcAudio ? (peer.active ? "This PC · Playing audio" : "This PC · Control + Audio") : "This PC · Control only";
+  else if (peer.isLocal) status = state.pcAudio ? (peer.active ? `${localComputer().name} · Playing audio` : `${localComputer().name} · Control + Audio`) : `${localComputer().name} · Control only`;
   else if (peer.connected) status = peer.active ? "Connected · Playing audio" : "Connected";
   else status = "Not connected";
 
@@ -98,7 +99,7 @@ function PeerRow({ peer, state, full, working }: { peer: Peer; state: AppState; 
           type="button"
           className={`row-button ${action.primary ? "primary-text" : ""}`}
           disabled={working}
-          title={action.label === "Switch" ? "Both audio slots are in use: drops a device that isn't this PC, then connects this one" : undefined}
+          title={action.label === "Switch" ? `Both audio slots are in use: drops a device that isn't ${localComputer().lower}, then connects this one` : undefined}
           onClick={action.run}
         >
           {action.label}

@@ -1,0 +1,232 @@
+name: QCBuddy release
+
+# Merge a release/qcbuddy* PR into main, or push a tag like qcbuddy-v0.1.2
+# (matching windows/app/src-tauri/tauri.conf.json), to release QCBuddy for
+# each platform independently, side by side:
+# - windows: the installer, signed for the updater, tagged qcbuddy-vX.Y.Z,
+#   in a draft with latest-windows.json. The Microsoft Store MSIX is a
+#   workflow artifact, uploaded to Partner Center by hand.
+# - macos (macos-release.yml): the universal DMG, tagged
+#   qcbuddy-macos-vX.Y.Z, in a draft of its own.
+# Either can fail, be re-run or be published without the other. Nothing is
+# public, and no installed copy is offered the update, until a draft is
+# published by hand (windows-publish-update.yml then updates the feed).
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  push:
+    tags: ["qcbuddy-v*"]
+
+permissions:
+  contents: write
+
+# Same as qcbuddy-ci.yml: no debug symbols in CI builds.
+env:
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+
+jobs:
+  prepare:
+    # Checks only, before either build: versions and changelog.
+    if: >-
+      github.event_name == 'push' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'release/qcbuddy') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Do not pick up later commits that may already have landed on main.
+          ref: ${{ github.event.pull_request.merge_commit_sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Validate versions
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version windows/app/src-tauri/tauri.conf.json)"
+          tag="qcbuddy-v$version"
+          if [[ "$EVENT_NAME" == push && "$REF_NAME" != "$tag" ]]; then
+            echo "::error::Tag $REF_NAME doesn't match tauri.conf.json version $version"; exit 1
+          fi
+          v="$(jq -r .version windows/app/package.json)"
+          if [[ "$v" != "$version" ]]; then
+            echo "::error::windows/app/package.json has version $v, expected $version"; exit 1
+          fi
+          for file in windows/app/src-tauri/Cargo.toml windows/core/Cargo.toml; do
+            if ! grep -q "^version = \"$version\"" "$file"; then
+              echo "::error::$file isn't version $version"; exit 1
+            fi
+          done
+          {
+            echo "version=$version"
+            echo "sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: CHANGELOG.md has this version
+        # Fails here, before the builds, if the changelog has no section for
+        # this version. Each platform writes its own release notes from it.
+        run: node windows/app/scripts/release-notes.mjs --version ${{ steps.version.outputs.version }} --changelog windows/CHANGELOG.md --repo ${{ github.repository }} --out /dev/null > /dev/null
+
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TAG: qcbuddy-v${{ needs.prepare.outputs.version }}
+      # The updater signing key (tauri signer generate). Installed copies only
+      # accept updates signed with it; keep an offline copy.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.prepare.outputs.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/app/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            windows/core
+            windows/app/src-tauri
+          key: ${{ hashFiles('.github/workflows/qcbuddy-ci.yml', '.github/workflows/qcbuddy-release.yml') }}
+
+      - name: Updater signing key is set
+        shell: pwsh
+        run: |
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY -or -not $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD) {
+            throw "Set the TAURI_SIGNING_PRIVATE_KEY and TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets (see windows/RELEASING.md)."
+          }
+
+      - name: Core tests
+        working-directory: windows/core
+        run: cargo test
+
+      - name: UI tests
+        working-directory: windows/app
+        run: |
+          npm ci
+          npm test
+
+      - name: Build and sign the installer
+        working-directory: windows/app
+        # tauri.release.conf.json adds createUpdaterArtifacts: the .sig file.
+        run: npx tauri build --config src-tauri/tauri.release.conf.json
+
+      - name: Package for the Microsoft Store
+        # The same build in an MSIX (the tray app only), which the Store
+        # signs. A workflow artifact only, uploaded to Partner Center by hand:
+        # MSIX isn't offered outside the Store. The identity is Partner
+        # Center's (QCBuddy → Product identity), in repository variables;
+        # without them it's a placeholder package for local testing only.
+        shell: pwsh
+        env:
+          MSIX_IDENTITY_NAME: ${{ vars.MSIX_IDENTITY_NAME }}
+          MSIX_PUBLISHER: ${{ vars.MSIX_PUBLISHER }}
+          MSIX_PUBLISHER_DISPLAY_NAME: ${{ vars.MSIX_PUBLISHER_DISPLAY_NAME }}
+        run: |
+          if (-not $env:MSIX_IDENTITY_NAME -or -not $env:MSIX_PUBLISHER -or -not $env:MSIX_PUBLISHER_DISPLAY_NAME) {
+            Write-Output "::warning::MSIX_* repository variables aren't set; the MSIX has a placeholder identity and can't go to the Store."
+            $env:MSIX_IDENTITY_NAME = "QCBuddy.Local"
+            $env:MSIX_PUBLISHER = "CN=QCBuddyLocal"
+            $env:MSIX_PUBLISHER_DISPLAY_NAME = "QCBuddy (local)"
+          }
+          windows/app/scripts/package-msix.ps1 `
+            -IdentityName $env:MSIX_IDENTITY_NAME `
+            -Publisher $env:MSIX_PUBLISHER `
+            -PublisherDisplayName $env:MSIX_PUBLISHER_DISPLAY_NAME `
+            -Out msix-dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-msix-${{ needs.prepare.outputs.version }}
+          path: msix-dist/*.msix
+          if-no-files-found: error
+
+      - name: Name it and checksum it
+        shell: pwsh
+        run: |
+          $built = "windows/app/src-tauri/target/release/bundle/nsis/QC Buddy_${env:VERSION}_x64-setup.exe"
+          $name = "QCBuddy_${env:VERSION}_x64-setup.exe"
+          New-Item -ItemType Directory dist | Out-Null
+          Copy-Item $built "dist/$name"
+          Copy-Item "$built.sig" "dist/$name.sig"
+          # The update feed for this version; the publish workflow copies it to qcbuddy-latest.
+          node windows/app/scripts/update-feed.mjs `
+            --version $env:VERSION `
+            --sig "dist/$name.sig" `
+            --url "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG/$name" `
+            --notes "QCBuddy $env:VERSION. Release notes: https://github.com/${{ github.repository }}/releases/tag/$env:RELEASE_TAG" `
+            --out dist/latest-windows.json
+          Push-Location dist
+          Get-ChildItem *.exe | ForEach-Object {
+            "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLower())  $($_.Name)"
+          } | Set-Content -Encoding ascii SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+          Pop-Location
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qcbuddy-windows-${{ needs.prepare.outputs.version }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Tag and draft the Windows release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        # GITHUB_TOKEN tag pushes do not trigger another workflow. Create the
+        # draft in this run instead of depending on a push event.
+        run: |
+          set -euo pipefail
+          node windows/app/scripts/release-notes.mjs --version "$VERSION" --changelog windows/CHANGELOG.md --repo "$GITHUB_REPOSITORY" --out release-notes.md
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            # An existing tag is never moved: it must already point here.
+            git fetch --tags origin
+            commit="$(git rev-parse HEAD)"
+            if git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+              if [[ "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" != "$commit" ]]; then
+                echo "::error::Tag $RELEASE_TAG already points to a different commit; bump the app version."; exit 1
+              fi
+            else
+              git tag "$RELEASE_TAG" "$commit"
+              git push origin "refs/tags/$RELEASE_TAG"
+            fi
+          fi
+          files=(
+            "dist/QCBuddy_${VERSION}_x64-setup.exe" "dist/QCBuddy_${VERSION}_x64-setup.exe.sig"
+            dist/latest-windows.json dist/SHA256SUMS.txt
+          )
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # A re-run after the draft was made: replace its files.
+            gh release upload "$RELEASE_TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --draft --prerelease \
+              --title "QCBuddy $VERSION (Windows)" \
+              --notes-file release-notes.md \
+              "${files[@]}"
+          fi
+
+  macos:
+    # Independent of the Windows job: its own tag (qcbuddy-macos-vX.Y.Z) and draft.
+    needs: prepare
+    uses: ./.github/workflows/macos-release.yml
+    with:
+      ref: ${{ needs.prepare.outputs.sha }}
+      release: true
+    secrets: inherit

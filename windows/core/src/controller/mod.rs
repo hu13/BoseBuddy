@@ -418,7 +418,7 @@ impl Controller {
         self.link = None;
         self.state.link = LinkState::Disconnected;
         self.state.channel = 0;
-        self.set_error("Bluetooth connection lost. PC audio may be unaffected; click Connect to reconnect.");
+        self.set_error("Bluetooth connection lost. Computer audio may be unaffected; click Connect to reconnect.");
         self.changed();
     }
 
@@ -450,7 +450,7 @@ impl Controller {
         let available = self.platform.pc_audio_available(&hint);
         if available != self.state.pc_audio {
             self.state.pc_audio = available;
-            self.log.write(format!("Windows audio available: {available}"));
+            self.log.write(format!("System audio available: {available}"));
             peers::mark_active(&mut self.state.peers, self.state.active_peer.as_deref(), available);
             self.changed();
         }

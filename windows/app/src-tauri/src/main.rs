@@ -32,6 +32,11 @@ const WIDTH: f64 = 372.0;
 /// Gap between the flyout and the screen edge / taskbar, like Windows 11 flyouts.
 const MARGIN: f64 = 12.0;
 
+#[tauri::command]
+fn host_platform() -> &'static str {
+    std::env::consts::OS
+}
+
 struct AppState {
     worker: Worker,
     latest: Arc<Latest>,
@@ -144,6 +149,7 @@ fn main() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updates::Updates::default())
         .invoke_handler(tauri::generate_handler![
+            host_platform,
             get_state,
             send,
             hide_flyout,
@@ -207,7 +213,11 @@ fn platform() -> Box<dyn Platform> {
     {
         Box::new(qcbuddy_core::platform::WindowsPlatform)
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        Box::new(qcbuddy_core::platform::MacPlatform)
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         Box::new(FakeHeadset::default())
     }
@@ -355,6 +365,7 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
     let light = app.state::<AppState>().light_taskbar.load(Ordering::SeqCst);
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon(None, light))
+        .icon_as_template(cfg!(target_os = "macos"))
         .tooltip("QCBuddy")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -428,11 +439,15 @@ fn place(window: &WebviewWindow) {
         .or_else(|| window.primary_monitor().ok().flatten());
     let (Some(monitor), Ok(size)) = (monitor, window.outer_size()) else { return };
     let area = monitor.work_area();
-    let (x, y) = flyout_origin(
+    let (x, mut y) = flyout_origin(
         (area.position.x, area.position.y, area.size.width, area.size.height),
         (size.width, size.height),
         monitor.scale_factor(),
     );
+    if cfg!(target_os = "macos") {
+        // The macOS menu bar is above the work area.
+        y = area.position.y + (MARGIN * monitor.scale_factor()).round() as i32;
+    }
     let _ = window.set_position(PhysicalPosition::new(x, y));
 }
 

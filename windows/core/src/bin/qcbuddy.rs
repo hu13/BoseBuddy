@@ -113,7 +113,7 @@ fn main() -> ExitCode {
     let log_path = if o.fake { data_dir().join("QCBuddy-fake.log") } else { default_path() };
     let log = if o.verbose { Log::file_and_stderr(&log_path) } else { Log::file(&log_path) };
     let Some(mut platform) = platform(o.fake) else {
-        eprintln!("Bluetooth control needs Windows; use --fake to try the simulated headset.");
+        eprintln!("Bluetooth control needs Windows or macOS; use --fake to try the simulated headset.");
         return ExitCode::from(2);
     };
 
@@ -168,7 +168,11 @@ fn platform(fake: bool) -> Option<Box<dyn Platform>> {
     {
         Some(Box::new(qcbuddy_core::platform::WindowsPlatform))
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    {
+        Some(Box::new(qcbuddy_core::platform::MacPlatform))
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     {
         None
     }

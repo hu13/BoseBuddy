@@ -36,6 +36,15 @@ describe("release notes", () => {
     expect(notes).toContain("https://github.com/hu13/BoseBuddy/blob/main/windows/CHANGELOG.md");
   });
 
+  it("give macOS its own install footer", () => {
+    const notes = releaseNotes({ changelog, version: "0.1.3", repo: "hu13/BoseBuddy", platform: "macos" });
+    expect(notes.startsWith("- Newest change.")).toBe(true);
+    expect(notes).toContain("QCBuddy_0.1.3_universal.dmg");
+    expect(notes).not.toContain("x64-setup.exe");
+    expect(notes).toContain("https://github.com/hu13/BoseBuddy/blob/main/windows/CHANGELOG.md");
+    expect(() => releaseNotes({ changelog, version: "0.1.3", repo: "x/y", platform: "linux" })).toThrow(/Unknown platform/);
+  });
+
   it("has a section for the version being released", () => {
     // Tests run from windows/app.
     const real = readFileSync("../CHANGELOG.md", "utf8");

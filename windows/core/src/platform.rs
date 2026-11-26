@@ -18,6 +18,9 @@ pub trait Platform: Send {
     fn pc_audio_available(&mut self, name_hint: &str) -> bool;
 }
 
+#[cfg(target_os = "macos")]
+pub use crate::macos::MacPlatform;
+
 /// Is an audio endpoint name the headset's? ("Headphones (Bose QC45)")
 pub fn endpoint_matches(endpoint: &str, name_hint: &str) -> bool {
     let name = endpoint.to_lowercase();
@@ -190,6 +193,19 @@ mod win {
         fn pc_audio_available(&mut self, name_hint: &str) -> bool {
             active_output_names().iter().any(|n| endpoint_matches(n, name_hint))
         }
+    }
+}
+
+/// Host-specific wording shared by the controller and CLI.
+pub fn this_computer() -> &'static str {
+    if cfg!(target_os = "macos") { "this Mac" } else { "this PC" }
+}
+
+pub fn audio_settings_help() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "macOS still isn't offering the headphones as an output. Connect them in System Settings → Bluetooth, then try again."
+    } else {
+        "Windows still isn't offering the headphones as an output. Connect them in Settings → Bluetooth & devices, then try again."
     }
 }
 
