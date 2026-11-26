@@ -3,7 +3,7 @@ name: Windows MSIX
 # By hand (Actions → Windows MSIX → Run workflow): build QCBuddy from the
 # chosen branch and package it as an MSIX with the Store identity, without
 # tagging or releasing anything. For testing the Store package on the test
-# PC; releases get theirs from windows-release.yml. The package carries the
+# PC; releases get theirs from qcbuddy-release.yml. The package carries the
 # version in tauri.conf.json plus ".0".
 
 on:
@@ -33,7 +33,7 @@ jobs:
           workspaces: |
             windows/core
             windows/app/src-tauri
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/qcbuddy-release.yml') }}
 
       - name: Build the app and the CLI
         # No updater artifacts (tauri.release.conf.json), so no signing key.

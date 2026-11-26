@@ -1,4 +1,4 @@
-name: Windows release
+name: QCBuddy release
 
 # Merge a release/qcbuddy* PR into main, or push a tag like qcbuddy-v0.1.2
 # (matching windows/app/src-tauri/tauri.conf.json), to build the QCBuddy
@@ -6,7 +6,8 @@ name: Windows release
 # draft GitHub release with latest-windows.json. Nothing is public, and no
 # installed copy is offered the update, until the draft is published by hand
 # (windows-publish-update.yml then updates the feed). The Microsoft Store
-# MSIX is a workflow artifact, uploaded to Partner Center by hand.
+# MSIX is a workflow artifact, uploaded to Partner Center by hand. The macOS
+# DMG (macos-release.yml) is attached to the same draft.
 
 on:
   pull_request:
@@ -24,13 +25,15 @@ env:
   CARGO_PROFILE_TEST_DEBUG: "0"
 
 jobs:
-  release:
+  windows:
     if: >-
       github.event_name == 'push' ||
       (github.event.pull_request.merged == true &&
        startsWith(github.event.pull_request.head.ref, 'release/qcbuddy') &&
        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: windows-latest
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
     env:
       # The updater signing key (tauri signer generate). Installed copies only
       # accept updates signed with it; keep an offline copy.
@@ -52,7 +55,7 @@ jobs:
           workspaces: |
             windows/core
             windows/app/src-tauri
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/qcbuddy-release.yml') }}
 
       - name: Updater signing key is set
         shell: pwsh
@@ -188,7 +191,15 @@ jobs:
           $version = "${{ steps.version.outputs.version }}"
           gh release create "$env:RELEASE_TAG" `
             --verify-tag --draft --prerelease `
-            --title "QCBuddy $version (Windows)" `
+            --title "QCBuddy $version" `
             --notes-file release-notes.md `
             "dist/QCBuddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe.sig" `
             dist/latest-windows.json dist/SHA256SUMS.txt
+
+  macos:
+    # The universal macOS DMG, attached to the same draft.
+    needs: windows
+    uses: ./.github/workflows/macos-release.yml
+    with:
+      tag: ${{ needs.windows.outputs.tag }}
+    secrets: inherit

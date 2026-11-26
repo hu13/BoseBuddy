@@ -3,7 +3,7 @@ name: Windows
 # Pull requests only (and by hand); pushes don't build.
 on:
   pull_request:
-    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/windows-release.yml"]
+    paths: ["windows/**", ".github/workflows/windows.yml", ".github/workflows/qcbuddy-release.yml"]
   workflow_dispatch:
 
 env:
@@ -32,7 +32,7 @@ jobs:
           # save again on an exact hit. Without the workflows in the key, a
           # cache saved by older steps (the first app run saved clippy-only
           # metadata) is restored forever while every run rebuilds everything.
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/qcbuddy-release.yml') }}
       - run: cargo test
       - run: cargo clippy --all-targets -- -D warnings
       - name: CLI smoke test (simulated headset)
@@ -67,7 +67,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: windows/app/src-tauri
-          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/windows-release.yml') }}
+          key: ${{ hashFiles('.github/workflows/windows.yml', '.github/workflows/qcbuddy-release.yml') }}
       - run: npm ci
       - run: npm test
       - run: npm run build
