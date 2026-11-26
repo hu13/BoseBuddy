@@ -1,17 +1,17 @@
-# QC Buddy — Windows port plan
+# QCBuddy — Windows port plan
 
 Status: M0–M2 done; M3 and M4 built (hardware checks pending); M6 release pipeline built (M5 polish deferred). Tray app in `windows/app`. Branch `feature/windows-port`.
 
 ## Goal
 
-**QC Buddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
+**QCBuddy** is the Windows sibling of BoseBuddy (macOS): a tray app with the
 same features. It controls a Bose headset over the PC's existing Bluetooth
 connection, with no phone app, account or cloud. Same look as the mockup
 (<https://claude.ai/artifact/V6g4HQsg6A3ChrRgbrxFEy>; static copy and
 screenshot in [`docs/`](docs/)): a flyout above the tray icon with Devices,
 Noise control and Equalizer cards.
 
-![QC Buddy tray flyout mockup](docs/mockup.png)
+![QCBuddy tray flyout mockup](docs/mockup.png)
 
 ### Parity scope (v1)
 
@@ -232,7 +232,7 @@ Findings:
 - **Updates (from 0.1.2):** Tauri updater plugin. Installed copies read
   `qcbuddy-latest/latest-{{target}}.json` (one feed per platform, so a
   future macOS build can release separately); the feed is updated only when
-  a release is published. Updates are signed with QC Buddy's own key (not
+  a release is published. Updates are signed with QCBuddy's own key (not
   code signing), kept out of the repo in GitHub secrets. See
   [`RELEASING.md`](RELEASING.md).
 - **Launch at login:** Tauri `autostart` plugin (registry Run key), fine
@@ -260,7 +260,7 @@ Findings:
   - No CLI: an app execution alias needs a second, hidden app
     (`AppListEntry="none"`), which the Store refuses without a
     HeadlessAppBypass waiver. `qcb` stays in the GitHub installer.
-- **Listing:** "QC Buddy — works with Bose QuietComfort headphones", no Bose
+- **Listing:** "QCBuddy — works with Bose QuietComfort headphones", no Bose
   logos or artwork; needs a Microsoft developer account, privacy statement
   (no telemetry, logs stay local) and screenshots.
 - Check Microsoft's current Store, signing and account requirements before
@@ -271,12 +271,19 @@ release), standalone MSIX outside the Store.
 
 ## Name
 
-**QC Buddy** (decided 2026-11-25).
+**QCBuddy** (decided 2026-11-25 as "QC Buddy"; renamed to "QCBuddy" the same
+day, the name reserved in Partner Center, which the Store requires as the
+package's display name).
 
-- Product name "QC Buddy", executable `QCBuddy.exe`, bundle identifier
-  `com.qcbuddy.app`, install folder and log folder `QC Buddy`.
+- Display name "QCBuddy", executable `QCBuddy.exe`, bundle identifier
+  `com.qcbuddy.app`.
+- Tauri's `productName`, the install folder and the log folder stay
+  `QC Buddy`: the NSIS installer keys its install folder and uninstall entry
+  on `productName`, so changing it would make updates install a second copy
+  beside the first, and moving the log folder would orphan existing EQ
+  presets. The GitHub installer's Start menu shortcut is still "QC Buddy".
 - Avoids "Bose" in the name, which keeps the Microsoft Store open as an
   option. Descriptions still say it works with Bose QuietComfort headphones
   (factual compatibility), with no Bose logos or artwork.
-- The macOS app stays BoseBuddy. The README and bosebuddy.com link to QC Buddy
+- The macOS app stays BoseBuddy. The README and bosebuddy.com link to QCBuddy
   as the Windows version.

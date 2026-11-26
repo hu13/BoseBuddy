@@ -24,9 +24,9 @@ export function releaseNotes({ changelog, version, repo }) {
 
 ---
 
-**First install?** Download \`QCBuddy_${version}_x64-setup.exe\` below; it installs for your user only, no admin needed. QC Buddy isn't code-signed yet, so Windows may show "Windows protected your PC": click **More info**, then **Run anyway**.
+**First install?** Download \`QCBuddy_${version}_x64-setup.exe\` below; it installs for your user only, no admin needed. QCBuddy isn't code-signed yet, so Windows may show "Windows protected your PC": click **More info**, then **Run anyway**.
 
-**Already on 0.1.2 or later?** QC Buddy offers this update itself (or right-click the tray icon → **Check for updates**).
+**Already on 0.1.2 or later?** QCBuddy offers this update itself (or right-click the tray icon → **Check for updates**).
 
 Earlier changes: [CHANGELOG.md](https://github.com/${repo}/blob/main/windows/CHANGELOG.md)
 `;

@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "flyout",
-        "title": "QC Buddy",
+        "title": "QCBuddy",
         "width": 372,
         "height": 300,
         "visible": false,

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  QC Buddy's MSIX manifest for the Microsoft Store. scripts/package-msix.ps1
+  QCBuddy's MSIX manifest for the Microsoft Store. scripts/package-msix.ps1
   fills in the placeholders: the identity from Partner Center (QCBuddy →
   Product identity) and the version from tauri.conf.json plus ".0".
 -->
@@ -13,7 +13,7 @@
   <Identity Name="{{IdentityName}}" Publisher="{{Publisher}}" Version="{{Version}}" ProcessorArchitecture="x64" />
 
   <Properties>
-    <DisplayName>QC Buddy</DisplayName>
+    <DisplayName>QCBuddy</DisplayName>
     <PublisherDisplayName>{{PublisherDisplayName}}</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
@@ -32,7 +32,7 @@
          in it as `qcb`. -->
     <Application Id="QCBuddy" Executable="QCBuddy.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="QC Buddy"
+        DisplayName="QCBuddy"
         Description="Battery, noise cancelling modes and EQ for Bose QuietComfort headphones, from the taskbar."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"

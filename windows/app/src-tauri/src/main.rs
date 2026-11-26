@@ -1,4 +1,4 @@
-//! QC Buddy tray app: a tray icon and a flyout window above it. All headset
+//! QCBuddy tray app: a tray icon and a flyout window above it. All headset
 //! work happens in qcbuddy-core's worker thread; the flyout sends it commands
 //! and renders the `state` events it emits.
 //!
@@ -196,7 +196,7 @@ fn main() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running QC Buddy");
+        .expect("error while running QCBuddy");
 }
 
 fn platform() -> Box<dyn Platform> {
@@ -340,22 +340,22 @@ fn battery_digits(level: u8, color: [u8; 4]) -> Vec<u8> {
 
 fn tooltip(state: &State) -> String {
     match (&state.link, state.battery) {
-        (LinkState::Connected, Some(battery)) => format!("QC Buddy · {} · {battery}%", state.device_name),
-        (LinkState::Connected, None) => format!("QC Buddy · {}", state.device_name),
-        (LinkState::Connecting, _) => "QC Buddy · connecting…".into(),
-        _ => "QC Buddy · not connected".into(),
+        (LinkState::Connected, Some(battery)) => format!("QCBuddy · {} · {battery}%", state.device_name),
+        (LinkState::Connected, None) => format!("QCBuddy · {}", state.device_name),
+        (LinkState::Connecting, _) => "QCBuddy · connecting…".into(),
+        _ => "QCBuddy · not connected".into(),
     }
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open QC Buddy", true, None::<&str>)?;
+    let open = MenuItem::with_id(app, "open", "Open QCBuddy", true, None::<&str>)?;
     let check = MenuItem::with_id(app, "check-updates", "Check for updates", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &check, &quit])?;
     let light = app.state::<AppState>().light_taskbar.load(Ordering::SeqCst);
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon(None, light))
-        .tooltip("QC Buddy")
+        .tooltip("QCBuddy")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id().as_ref() {
@@ -507,11 +507,11 @@ mod tests {
     #[test]
     fn tooltips() {
         let mut c = Controller::new(Box::new(FakeHeadset::default()), Log::memory());
-        assert_eq!(tooltip(c.state()), "QC Buddy · not connected");
+        assert_eq!(tooltip(c.state()), "QCBuddy · not connected");
         c.start();
-        assert_eq!(tooltip(c.state()), "QC Buddy · Bose QC45 · 80%");
+        assert_eq!(tooltip(c.state()), "QCBuddy · Bose QC45 · 80%");
         let off = Controller::new(Box::new(FakeHeadset::new(FakeState { powered_off: true, ..FakeState::default() })), Log::memory());
-        assert_eq!(tooltip(off.state()), "QC Buddy · not connected");
+        assert_eq!(tooltip(off.state()), "QCBuddy · not connected");
     }
 
     #[test]

@@ -1,6 +1,6 @@
 name: Windows MSIX
 
-# By hand (Actions → Windows MSIX → Run workflow): build QC Buddy from the
+# By hand (Actions → Windows MSIX → Run workflow): build QCBuddy from the
 # chosen branch and package it as an MSIX with the Store identity, without
 # tagging or releasing anything. For testing the Store package on the test
 # PC; releases get theirs from windows-release.yml. The package carries the

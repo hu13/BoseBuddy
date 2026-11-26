@@ -3,7 +3,7 @@ name = "qcbuddy"
 version = "0.1.3"
 edition = "2021"
 publish = false
-description = "QC Buddy: control Bose QuietComfort headphones from the Windows tray"
+description = "QCBuddy: control Bose QuietComfort headphones from the Windows tray"
 license = "MIT"
 
 [build-dependencies]

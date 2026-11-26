@@ -45,7 +45,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force ../app/src-tauri/target/release | Out-Null
           Copy-Item target/debug/qcbuddy.exe ../app/src-tauri/target/release/QCBuddy.exe
-          ../app/scripts/package-msix.ps1 -IdentityName QCBuddy.Local -Publisher "CN=QCBuddyLocal" -PublisherDisplayName "QC Buddy (local)" -Out ../../msix-check
+          ../app/scripts/package-msix.ps1 -IdentityName QCBuddy.Local -Publisher "CN=QCBuddyLocal" -PublisherDisplayName "QCBuddy (local)" -Out ../../msix-check
 
   app:
     # UI tests (render from core/src/ui_fixtures.rs fixtures), type check,

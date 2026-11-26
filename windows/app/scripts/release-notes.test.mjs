@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { changelogSection, releaseNotes } from "./release-notes.mjs";
 
-const changelog = `# QC Buddy changelog
+const changelog = `# QCBuddy changelog
 
 Intro.
 
