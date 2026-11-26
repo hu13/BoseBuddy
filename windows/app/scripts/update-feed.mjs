@@ -1,5 +1,5 @@
 // Builds latest-<target>.json, the Tauri updater feed for one platform.
-// QC Buddy reads qcbuddy-latest/latest-{{target}}.json; on Windows the
+// QCBuddy reads qcbuddy-latest/latest-{{target}}.json; on Windows the
 // updater looks up "windows-x86_64-nsis", then "windows-x86_64".
 //
 //   node scripts/update-feed.mjs --version 0.1.2 --sig <installer>.sig \

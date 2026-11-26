@@ -1,4 +1,4 @@
-//! `qcbuddy`: QC Buddy's controller from the command line, for testing every
+//! `qcbuddy`: QCBuddy's controller from the command line, for testing every
 //! feature on the Windows PC without the tray UI. `--fake` runs against a
 //! simulated QC45 instead of Bluetooth.
 
@@ -15,7 +15,7 @@ use qcbuddy_core::platform::Platform;
 use qcbuddy_core::protocol::canonical_mac;
 
 const USAGE: &str = "\
-QC Buddy CLI: control a Bose headset over this PC's Bluetooth connection.
+QCBuddy CLI: control a Bose headset over this PC's Bluetooth connection.
 
 usage: qcbuddy [options] [command] [args]
 
@@ -43,7 +43,7 @@ commands:
   power-off
   watch [SECONDS]            act like an open flyout: poll every 15 s, print changes
   log                        log file location and its last 40 lines
-  update [--install]         is there a newer QC Buddy? (--install: the tray app
+  update [--install]         is there a newer QCBuddy? (--install: the tray app
                              checks and offers Install and restart; the Store
                              copy opens its Store page)
 
@@ -200,17 +200,17 @@ const HEADSET_COMMANDS: &[&str] = &[
 ];
 
 /// `qcb update`: read the feed installed copies read and say whether there's
-/// a newer QC Buddy. Uses Windows' own curl.exe, so the CLI needs no HTTPS
+/// a newer QCBuddy. Uses Windows' own curl.exe, so the CLI needs no HTTPS
 /// code of its own. With --install, the tray app checks and offers it.
 fn update(install: bool) -> ExitCode {
     use qcbuddy_core::update_feed::{feed_version, verdict, Verdict, CURRENT_VERSION, WINDOWS_FEED_URL};
     // The Store copy updates through the Store, which may not have the
     // latest GitHub release yet: don't compare it with the GitHub feed.
     if qcbuddy_core::package::is_packaged() {
-        println!("This is QC Buddy {CURRENT_VERSION} from the Microsoft Store, which keeps it up to date.");
+        println!("This is QCBuddy {CURRENT_VERSION} from the Microsoft Store, which keeps it up to date.");
         if install {
             if qcbuddy_core::package::open_store_page() {
-                println!("Opened QC Buddy's Store page.");
+                println!("Opened QCBuddy's Store page.");
             } else {
                 eprintln!("Couldn't open the Microsoft Store.");
                 return ExitCode::FAILURE;
@@ -229,7 +229,7 @@ fn update(install: bool) -> ExitCode {
         Ok(out) if !out.status.success() => {
             let reason = String::from_utf8_lossy(&out.stderr).trim().to_string();
             if reason.contains("404") {
-                println!("No QC Buddy update has been published yet (this is {CURRENT_VERSION}).");
+                println!("No QCBuddy update has been published yet (this is {CURRENT_VERSION}).");
                 return ExitCode::SUCCESS;
             }
             eprintln!("Couldn't check for updates: {reason}");
@@ -245,10 +245,10 @@ fn update(install: bool) -> ExitCode {
         }
     };
     match verdict(CURRENT_VERSION, &latest) {
-        Verdict::UpToDate => println!("QC Buddy {CURRENT_VERSION} is up to date."),
-        Verdict::Ahead(v) => println!("This is QC Buddy {CURRENT_VERSION}, newer than the published {v}."),
+        Verdict::UpToDate => println!("QCBuddy {CURRENT_VERSION} is up to date."),
+        Verdict::Ahead(v) => println!("This is QCBuddy {CURRENT_VERSION}, newer than the published {v}."),
         Verdict::Newer(v) => {
-            println!("QC Buddy {v} is available (this is {CURRENT_VERSION}).");
+            println!("QCBuddy {v} is available (this is {CURRENT_VERSION}).");
             if !install {
                 println!("Run `qcb update --install`, or right-click the tray icon → Check for updates.");
             }
@@ -259,10 +259,10 @@ fn update(install: bool) -> ExitCode {
         let app = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("QCBuddy.exe")));
         match app.filter(|p| p.exists()) {
             Some(app) => match std::process::Command::new(&app).arg("--check-for-updates").spawn() {
-                Ok(_) => println!("Opened QC Buddy to check and install: click \"Install and restart\" in its flyout."),
+                Ok(_) => println!("Opened QCBuddy to check and install: click \"Install and restart\" in its flyout."),
                 Err(e) => eprintln!("Couldn't start {}: {e}", app.display()),
             },
-            None => println!("QC Buddy (QCBuddy.exe) isn't installed next to qcb; install it from the releases page."),
+            None => println!("QCBuddy (QCBuddy.exe) isn't installed next to qcb; install it from the releases page."),
         }
     }
     ExitCode::SUCCESS

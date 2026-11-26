@@ -1,4 +1,4 @@
-# Releasing QC Buddy (Windows)
+# Releasing QCBuddy (Windows)
 
 ## Once: the update signing key
 
@@ -46,7 +46,7 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
    copies are offered the update at their next check (at most 6 hours).
 ## Manual release fallback
 Tag the intended commit with
-`git tag -a qcbuddy-vX.Y.Z -m "QC Buddy X.Y.Z (Windows)"` and push that
+`git tag -a qcbuddy-vX.Y.Z -m "QCBuddy X.Y.Z (Windows)"` and push that
 tag. Tag pushes still run the same release workflow.
 
 ## The update feed
@@ -97,7 +97,7 @@ and **Check for updates** opens its Store page instead (`core/src/package.rs`).
 **Between releases:** Actions → **Windows MSIX** → Run workflow builds a
 `.msix` from any branch, without tagging or releasing. Or build one on the
 test PC: `make msix` from the repo root (or `npm run msix` in `app`) builds
-the app and packages it with QC Buddy's identity, in
+the app and packages it with QCBuddy's identity, in
 `app\src-tauri\target\msix`. `make msix-install` also installs it, unsigned
 (Developer Mode on). Double-clicking the unsigned `.msix` doesn't work
 (0x800B010A); upload that same unsigned file to Partner Center.

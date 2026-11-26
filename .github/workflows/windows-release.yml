@@ -1,7 +1,7 @@
 name: Windows release
 
 # Merge a release/qcbuddy* PR into main, or push a tag like qcbuddy-v0.1.2
-# (matching windows/app/src-tauri/tauri.conf.json), to build the QC Buddy
+# (matching windows/app/src-tauri/tauri.conf.json), to build the QCBuddy
 # installer, sign it for the updater, and attach it to a
 # draft GitHub release with latest-windows.json. Nothing is public, and no
 # installed copy is offered the update, until the draft is published by hand
@@ -119,7 +119,7 @@ jobs:
             Write-Output "::warning::MSIX_* repository variables aren't set; the MSIX has a placeholder identity and can't go to the Store."
             $env:MSIX_IDENTITY_NAME = "QCBuddy.Local"
             $env:MSIX_PUBLISHER = "CN=QCBuddyLocal"
-            $env:MSIX_PUBLISHER_DISPLAY_NAME = "QC Buddy (local)"
+            $env:MSIX_PUBLISHER_DISPLAY_NAME = "QCBuddy (local)"
           }
           windows/app/scripts/package-msix.ps1 `
             -IdentityName $env:MSIX_IDENTITY_NAME `
@@ -170,7 +170,7 @@ jobs:
             --version $version `
             --sig "dist/$name.sig" `
             --url "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG/$name" `
-            --notes "QC Buddy $version. Release notes: https://github.com/${{ github.repository }}/releases/tag/$env:RELEASE_TAG" `
+            --notes "QCBuddy $version. Release notes: https://github.com/${{ github.repository }}/releases/tag/$env:RELEASE_TAG" `
             --out dist/latest-windows.json
           Push-Location dist
           Get-ChildItem *.exe | ForEach-Object {
@@ -188,7 +188,7 @@ jobs:
           $version = "${{ steps.version.outputs.version }}"
           gh release create "$env:RELEASE_TAG" `
             --verify-tag --draft --prerelease `
-            --title "QC Buddy $version (Windows)" `
+            --title "QCBuddy $version (Windows)" `
             --notes-file release-notes.md `
             "dist/QCBuddy_${version}_x64-setup.exe" "dist/QCBuddy_${version}_x64-setup.exe.sig" `
             dist/latest-windows.json dist/SHA256SUMS.txt

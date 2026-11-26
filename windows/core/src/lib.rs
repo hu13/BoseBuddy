@@ -1,4 +1,4 @@
-//! QC Buddy core: everything except the tray UI. Talks to a Bose headset over
+//! QCBuddy core: everything except the tray UI. Talks to a Bose headset over
 //! the PC's Bluetooth connection (BMAP over RFCOMM), ported from BoseBuddy's
 //! macOS sources. Used by the tray app and the `qcbuddy` CLI.
 

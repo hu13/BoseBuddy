@@ -1,5 +1,5 @@
 //! The update feed the tray app's updater reads, for the CLI's
-//! `qcb update`: is there a newer QC Buddy than this one?
+//! `qcb update`: is there a newer QCBuddy than this one?
 
 use std::cmp::Ordering;
 

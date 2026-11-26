@@ -217,7 +217,7 @@ impl Controller {
         self.state.busy = None;
         self.state.peer_action = None;
         self.state.action_note = None;
-        self.set_error("Something went wrong in QC Buddy. The details are in the log; try again.");
+        self.set_error("Something went wrong in QCBuddy. The details are in the log; try again.");
     }
 
     pub fn clear_error(&mut self) {
@@ -235,7 +235,7 @@ impl Controller {
     // MARK: - Lifecycle
 
     /// App launch: attach to a headset that is already connected to this PC.
-    /// Never starts a new Bluetooth connection, so opening QC Buddy can't
+    /// Never starts a new Bluetooth connection, so opening QCBuddy can't
     /// displace another device.
     pub fn start(&mut self) {
         self.state.headphones = self.platform.paired_headphones();
@@ -386,7 +386,7 @@ impl Controller {
         self.logged_failures.clear();
         let name = if self.state.product_name.is_empty() { &self.state.device_name } else { &self.state.product_name };
         self.log.write(format!(
-            "session: QC Buddy {APP_VERSION} · {} · {name} fw {} · channel {channel}",
+            "session: QCBuddy {APP_VERSION} · {} · {name} fw {} · channel {channel}",
             std::env::consts::OS,
             if self.state.firmware.is_empty() { "?" } else { &self.state.firmware },
         ));

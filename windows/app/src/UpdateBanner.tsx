@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { UpdateStatus } from "./types";
 
-/** "QC Buddy 0.1.3 is available · Install and restart", then progress. */
+/** "QCBuddy 0.1.3 is available · Install and restart", then progress. */
 export function UpdateBanner({ status }: { status: UpdateStatus }) {
   const install = () => {
     // Errors come back as a "failed" status event.
@@ -22,7 +22,7 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
     case "upToDate":
       return (
         <div className="update" role="status">
-          <span>QC Buddy {status.version} is up to date.</span>
+          <span>QCBuddy {status.version} is up to date.</span>
           <button type="button" className="link-button" onClick={dismiss}>
             OK
           </button>
@@ -31,7 +31,7 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
     case "available":
       return (
         <div className="update" role="status">
-          <span>QC Buddy {status.version} is available.</span>
+          <span>QCBuddy {status.version} is available.</span>
           <button type="button" className="link-button" onClick={install}>
             Install and restart
           </button>
@@ -46,7 +46,7 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
     case "installing":
       return (
         <div className="update" role="status">
-          <span>Installing the update; QC Buddy will restart.</span>
+          <span>Installing the update; QCBuddy will restart.</span>
         </div>
       );
     case "failed":

@@ -1,4 +1,4 @@
-# QC Buddy hardware checklist
+# QCBuddy hardware checklist
 
 What unit tests can't cover: the real Bluetooth link, Windows' audio
 outputs, and the headset's own behaviour. Run it on the Windows test PC with
@@ -43,7 +43,7 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | # | Check | How | Last pass |
 |---|---|---|---|
 | 11 | Apply a preset; another app sees it after reopening | `qcbuddy preset warm`; flyout chips | 2026-11-25 |
-| 11a | Cross-app: change EQ/mode in BoseBuddy (Mac) or the Bose app; QC Buddy shows it when the flyout opens, and BoseBuddy shows QC Buddy's change when its popover opens | Both apps | 2026-11-25 (QC Buddy side) |
+| 11a | Cross-app: change EQ/mode in BoseBuddy (Mac) or the Bose app; QCBuddy shows it when the flyout opens, and BoseBuddy shows QCBuddy's change when its popover opens | Both apps | 2026-11-25 (QCBuddy side) |
 | 11b | Save, rename, delete a custom preset; it shows in `qcbuddy preset` too | Flyout → Save as preset… | |
 | 12 | One band at a time, incl. negative values | `qcbuddy eq-band treble -4` | |
 | 13 | Sidetone Off/High/Med/Low audible on a call | Flyout → Sidetone | 2026-11-25 (set; not heard on a call) |
@@ -82,6 +82,6 @@ tray app (`windows\app`: `npm run tauri dev`). Check
 | 31 | Installing a newer version over the old one keeps presets and the tray icon position | | |
 | 32 | `SHA256SUMS.txt` matches the download | `Get-FileHash` | |
 | 33 | Release build signs the installer (`.sig` next to it) | Local `tauri build --config src-tauri/tauri.release.conf.json` with the key | 2026-11-25 |
-| 34 | Update offered: an older installed version shows "QC Buddy x.y.z is available" within ~10 s of starting, after the newer release is published | Install the previous release, publish the new one | |
+| 34 | Update offered: an older installed version shows "QCBuddy x.y.z is available" within ~10 s of starting, after the newer release is published | Install the previous release, publish the new one | |
 | 35 | Install and restart: downloads, verifies, installs passively, restarts on the new version; presets and log kept | Click the banner | |
 | 36 | A plain-http feed is refused | `QCBUDDY_UPDATE_URL=http://…` | 2026-11-25 |

@@ -1,6 +1,6 @@
 name: Windows update feed
 
-# When a QC Buddy release is published (not while it's a draft), copy its
+# When a QCBuddy release is published (not while it's a draft), copy its
 # latest-windows.json to the permanent qcbuddy-latest release. Installed
 # copies read qcbuddy-latest/latest-{{target}}.json, so this is the moment
 # the update goes out. Run it by hand with an older tag to roll back.
@@ -36,8 +36,8 @@ jobs:
           if ! gh release view qcbuddy-latest --repo "$REPO" >/dev/null 2>&1; then
             # A pre-release, never "Latest", so the macOS app's latest release is untouched.
             gh release create qcbuddy-latest --repo "$REPO" --prerelease --latest=false \
-              --title "QC Buddy update feed" \
-              --notes "Update feed read by installed copies of QC Buddy (latest-{target}.json). Don't delete; download QC Buddy from the qcbuddy-v* releases."
+              --title "QCBuddy update feed" \
+              --notes "Update feed read by installed copies of QCBuddy (latest-{target}.json). Don't delete; download QCBuddy from the qcbuddy-v* releases."
           fi
           gh release upload qcbuddy-latest feed/latest-*.json --repo "$REPO" --clobber
           echo "Serving $TAG: $(jq -r .version feed/latest-windows.json)"

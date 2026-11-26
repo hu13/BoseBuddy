@@ -32,12 +32,12 @@ pub fn is_packaged() -> bool {
     family_name().is_some()
 }
 
-/// QC Buddy's Store page, which offers the update when there is one.
+/// QCBuddy's Store page, which offers the update when there is one.
 pub fn store_page(family_name: &str) -> String {
     format!("ms-windows-store://pdp/?PFN={family_name}")
 }
 
-/// Open QC Buddy's Store page. False outside a package or if it can't open.
+/// Open QCBuddy's Store page. False outside a package or if it can't open.
 pub fn open_store_page() -> bool {
     let Some(name) = family_name() else { return false };
     // explorer.exe hands the ms-windows-store: link to the Store app.

@@ -1,9 +1,9 @@
-//! Automatic updates (Tauri updater). QC Buddy checks the update feed at
+//! Automatic updates (Tauri updater). QCBuddy checks the update feed at
 //! `qcbuddy-latest/latest-{{target}}.json` (latest-windows.json here) 10 s
 //! after starting and every 6 hours. A newer version is offered in the
 //! flyout; nothing is installed until the user clicks. The download is
 //! verified against the public key in tauri.conf.json, installed passively,
-//! and QC Buddy restarts. The feed only changes when a release is published
+//! and QCBuddy restarts. The feed only changes when a release is published
 //! (windows-publish-update.yml), so drafts are never offered.
 //!
 //! Check by hand: `QCBuddy.exe --check-for-updates` (forwarded to the
@@ -291,7 +291,7 @@ mod tests {
     fn our_feed_format_is_what_the_updater_reads() {
         let feed = serde_json::json!({
             "version": "0.1.3",
-            "notes": "QC Buddy 0.1.3. Release notes: https://github.com/hu13/BoseBuddy/releases/tag/qcbuddy-v0.1.3",
+            "notes": "QCBuddy 0.1.3. Release notes: https://github.com/hu13/BoseBuddy/releases/tag/qcbuddy-v0.1.3",
             "pub_date": "2026-11-25T23:00:00.000Z",
             "platforms": {
                 "windows-x86_64": {

@@ -1,4 +1,4 @@
-# QC Buddy tray app
+# QCBuddy tray app
 
 Tauri 2 app: a tray icon and a flyout above it (`src/`, React), on top of
 [`../core`](../core) (all headset work). Status: header (name, battery,

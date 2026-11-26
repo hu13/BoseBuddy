@@ -128,7 +128,7 @@ describe("App", () => {
       name === "get_state"
         ? Promise.resolve(snapshot(fixtures.connected))
         : name === "send"
-          ? Promise.reject("QC Buddy is still working on earlier changes. Try again in a moment.")
+          ? Promise.reject("QCBuddy is still working on earlier changes. Try again in a moment.")
           : Promise.resolve(null),
     );
     render(<App />);

@@ -92,8 +92,8 @@ pub enum SendError {
 impl std::fmt::Display for SendError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            SendError::Busy => "QC Buddy is still working on earlier changes. Try again in a moment.",
-            SendError::Stopped => "QC Buddy's connection to the headphones stopped. Restart QC Buddy.",
+            SendError::Busy => "QCBuddy is still working on earlier changes. Try again in a moment.",
+            SendError::Stopped => "QCBuddy's connection to the headphones stopped. Restart QCBuddy.",
         })
     }
 }

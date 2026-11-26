@@ -7,7 +7,7 @@
 #   scripts/package-msix.ps1 [-Build] [-Out <folder>]
 #
 # -Build runs the build first; without it, it must already be there.
-# The identity defaults to QC Buddy's (Partner Center -> QCBuddy -> Product
+# The identity defaults to QCBuddy's (Partner Center -> QCBuddy -> Product
 # identity; it's public, in every package the Store ships). Writes
 # <Out>/QCBuddy_<version>.0_x64.msix (default Out: src-tauri/target/msix) and
 # leaves the staged files in <Out>/msix: `Add-AppxPackage -Register

@@ -13,7 +13,7 @@ describe("UpdateBanner", () => {
 
   it("offers the new version and installs only on a click", async () => {
     render(<UpdateBanner status={{ kind: "available", version: "0.1.3" }} />);
-    expect(screen.getByText("QC Buddy 0.1.3 is available.")).toBeTruthy();
+    expect(screen.getByText("QCBuddy 0.1.3 is available.")).toBeTruthy();
     expect(invokeMock).not.toHaveBeenCalledWith("install_update");
     await userEvent.click(screen.getByRole("button", { name: "Install and restart" }));
     expect(invokeMock).toHaveBeenCalledWith("install_update");
@@ -25,7 +25,7 @@ describe("UpdateBanner", () => {
     rerender(<UpdateBanner status={{ kind: "downloading", percent: null }} />);
     expect(screen.getByText("Downloading the update…")).toBeTruthy();
     rerender(<UpdateBanner status={{ kind: "installing" }} />);
-    expect(screen.getByText("Installing the update; QC Buddy will restart.")).toBeTruthy();
+    expect(screen.getByText("Installing the update; QCBuddy will restart.")).toBeTruthy();
   });
 
   it("explains a failed install and retries the install", async () => {
@@ -51,7 +51,7 @@ describe("UpdateBanner", () => {
     const { rerender } = render(<UpdateBanner status={{ kind: "checking" }} />);
     expect(screen.getByText("Checking for updates…")).toBeTruthy();
     rerender(<UpdateBanner status={{ kind: "upToDate", version: "0.1.2" }} />);
-    expect(screen.getByText("QC Buddy 0.1.2 is up to date.")).toBeTruthy();
+    expect(screen.getByText("QCBuddy 0.1.2 is up to date.")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "OK" }));
     expect(invokeMock).toHaveBeenCalledWith("dismiss_update_status");
   });
@@ -66,7 +66,7 @@ describe("UpdateBanner", () => {
     await screen.findByText("80%");
     expect(screen.queryByText(/is available/)).toBeNull();
     emit("update", { kind: "available", version: "0.1.3" });
-    expect(screen.getByText("QC Buddy 0.1.3 is available.")).toBeTruthy();
+    expect(screen.getByText("QCBuddy 0.1.3 is available.")).toBeTruthy();
   });
 
   it("shows an update already found before the flyout opened", async () => {
@@ -80,6 +80,6 @@ describe("UpdateBanner", () => {
       ),
     );
     render(<App />);
-    await waitFor(() => expect(screen.getByText("QC Buddy 0.1.3 is available.")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("QCBuddy 0.1.3 is available.")).toBeTruthy());
   });
 });
