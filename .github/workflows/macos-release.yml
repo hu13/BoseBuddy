@@ -3,11 +3,14 @@ name: macOS release
 # Builds the QCBuddy Tauri app for macOS (universal: Apple silicon and Intel)
 # as a .dmg installer.
 #
-# - qcbuddy-release.yml calls it after creating the draft release, so every
-#   qcbuddy-v* draft also gets QCBuddy_X.Y.Z_universal.dmg.
+# - qcbuddy-release.yml calls it with release: true, independently of the
+#   Windows build: it tags the commit qcbuddy-macos-vX.Y.Z and creates the
+#   macOS draft release (DMG, SHA256SUMS.txt). Windows has its own tag
+#   (qcbuddy-vX.Y.Z) and draft, so either platform can fail, be re-run or be
+#   published without the other.
 # - Run it by hand (Actions → Run workflow) with no tag for a test DMG, a
-#   workflow artifact only; with a tag like qcbuddy-v0.1.3 it builds that tag
-#   and attaches the DMG to its release (draft or published).
+#   workflow artifact only; with a tag like qcbuddy-macos-v0.1.3 it rebuilds
+#   that tag and replaces the files on its release.
 #
 # Signing: with the APPLE_CERTIFICATE secrets set, the app is signed with that
 # Developer ID, and with the APPLE_ID secrets too it's notarized. Without
@@ -17,14 +20,18 @@ name: macOS release
 on:
   workflow_call:
     inputs:
-      tag:
-        description: "Release tag to build and attach the DMG to, e.g. qcbuddy-v0.1.3"
+      ref:
+        description: "Commit to build"
         type: string
         required: true
+      release:
+        description: "Tag the commit qcbuddy-macos-vX.Y.Z and create its draft release"
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to build and attach to (blank: this branch, artifact only)"
+        description: "Release to rebuild and replace the files of, e.g. qcbuddy-macos-v0.1.3 (blank: this branch, artifact only)"
         type: string
         required: false
 
@@ -40,10 +47,11 @@ jobs:
     runs-on: macos-15
     env:
       TAG: ${{ inputs.tag }}
+      RELEASE: ${{ inputs.release }}
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ inputs.tag || github.sha }}
+          ref: ${{ inputs.ref || inputs.tag || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -59,15 +67,30 @@ jobs:
             windows/app/src-tauri
           key: ${{ hashFiles('.github/workflows/macos-release.yml') }}
 
-      - name: Validate the version
+      - name: Validate the version and resolve the release tag
         id: version
         run: |
+          set -euo pipefail
           version="$(jq -r .version windows/app/src-tauri/tauri.conf.json)"
-          if [[ -n "$TAG" && "$TAG" != "qcbuddy-v$version" ]]; then
-            echo "::error::Tag $TAG doesn't match tauri.conf.json version $version"
-            exit 1
+          tag="qcbuddy-macos-v$version"
+          if [[ -n "$TAG" && "$TAG" != "$tag" ]]; then
+            echo "::error::Tag $TAG doesn't match tauri.conf.json version $version (expected $tag)"; exit 1
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          release=false
+          if [[ "$RELEASE" == true || -n "$TAG" ]]; then
+            release=true
+            # An existing tag is never moved: it must already point here.
+            git fetch --tags origin
+            if git show-ref --verify --quiet "refs/tags/$tag" &&
+               [[ "$(git rev-parse "refs/tags/$tag^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo "::error::Tag $tag already points to a different commit; bump the app version."; exit 1
+            fi
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Core tests
         working-directory: windows/core
@@ -91,6 +114,9 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # GITHUB_ENV takes one line per variable: drop the line breaks that
+          # GNU base64 (and some secret pastes) wrap the certificate with.
+          APPLE_CERTIFICATE="$(printf '%s' "$APPLE_CERTIFICATE" | tr -d '\r\n ')"
           if [[ -n "$APPLE_CERTIFICATE" && -n "$APPLE_SIGNING_IDENTITY" ]]; then
             {
               echo "APPLE_CERTIFICATE=$APPLE_CERTIFICATE"
@@ -123,7 +149,7 @@ jobs:
           mkdir dist
           built="windows/app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/QC Buddy_${VERSION}_universal.dmg"
           cp "$built" "dist/QCBuddy_${VERSION}_universal.dmg"
-          (cd dist && shasum -a 256 *.dmg | tee SHA256SUMS-macos.txt)
+          (cd dist && shasum -a 256 *.dmg | tee SHA256SUMS.txt)
 
       - uses: actions/upload-artifact@v4
         with:
@@ -131,8 +157,28 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      - name: Attach to the release
-        if: inputs.tag != ''
+      - name: Tag and draft the macOS release
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/*.dmg dist/SHA256SUMS-macos.txt --repo "${{ github.repository }}" --clobber
+          REPO: ${{ github.repository }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          node windows/app/scripts/release-notes.mjs --version "$VERSION" --changelog windows/CHANGELOG.md --repo "$REPO" --platform macos --out release-notes.md
+          # GITHUB_TOKEN tag pushes don't trigger other workflows.
+          if ! git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"; then
+            git tag "$RELEASE_TAG" HEAD
+            git push origin "refs/tags/$RELEASE_TAG"
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            # A re-run, or a rebuild by hand: replace the files.
+            gh release upload "$RELEASE_TAG" dist/* --repo "$REPO" --clobber
+          else
+            gh release create "$RELEASE_TAG" --repo "$REPO" \
+              --verify-tag --draft --prerelease \
+              --title "QCBuddy $VERSION (macOS)" \
+              --notes-file release-notes.md \
+              dist/*
+          fi

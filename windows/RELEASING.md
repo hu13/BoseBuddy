@@ -28,12 +28,17 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
    The release page shows that section plus a short install footer
    (`app/scripts/release-notes.mjs`); the release fails early if the section
    is missing.
-2. Merge the PR. `qcbuddy-release.yml` checks the versions, runs the tests,
-   builds and signs the installer, tags the exact merge commit as
-   `qcbuddy-vX.Y.Z`, and creates a **draft** pre-release with:
-   - `QCBuddy_X.Y.Z_x64-setup.exe` and its `.sig`
-   - `latest-windows.json` (the update feed entry for this version)
-   - `SHA256SUMS.txt`
+2. Merge the PR. `qcbuddy-release.yml` checks the versions and the
+   changelog, then releases each platform independently, side by side:
+   - **Windows** (tests, signed installer, MSIX): tags the exact merge
+     commit as `qcbuddy-vX.Y.Z` and creates a **draft** pre-release with
+     `QCBuddy_X.Y.Z_x64-setup.exe` and its `.sig`, `latest-windows.json`
+     (the update feed entry for this version) and `SHA256SUMS.txt`.
+   - **macOS** (tests, universal DMG): tags the same commit as
+     `qcbuddy-macos-vX.Y.Z` and creates its own draft with
+     `QCBuddy_X.Y.Z_universal.dmg` and `SHA256SUMS.txt` (see macOS DMG).
+   If one platform fails, the other still gets its draft; fix the cause and
+   **Re-run failed jobs**.
    The tag version comes from `tauri.conf.json`, not the branch name.
    Closed-but-unmerged PRs and other source branches do not release.
    An existing tag is never moved: it must point to the same commit or
@@ -128,10 +133,13 @@ than the last; a rejected submission needs a version bump.
 
 `macos-release.yml` builds the Tauri app for macOS as a universal (Apple
 silicon and Intel) `QCBuddy_X.Y.Z_universal.dmg`. `qcbuddy-release.yml` runs
-it after creating the draft, so the draft also gets the DMG and
-`SHA256SUMS-macos.txt`. Actions → **macOS release** → Run workflow builds a
-test DMG from any branch (artifact only), or, with a `qcbuddy-vX.Y.Z` tag,
-rebuilds that tag and replaces the DMG on its release.
+it alongside the Windows build; it tags the commit `qcbuddy-macos-vX.Y.Z`
+and creates a separate draft, "QCBuddy X.Y.Z (macOS)", which is checked and
+published on its own. Publishing it doesn't touch the Windows update feed
+(`windows-publish-update.yml` only acts on `qcbuddy-v*` releases). Actions →
+**macOS release** → Run workflow builds a test DMG from any branch (artifact
+only), or, with a `qcbuddy-macos-vX.Y.Z` tag, rebuilds that tag and replaces
+the files on its release.
 
 The macOS copy doesn't read the update feed yet (there's no
 `latest-darwin.json`); users download each new DMG by hand.
