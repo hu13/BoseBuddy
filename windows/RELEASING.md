@@ -98,7 +98,9 @@ and **Check for updates** opens its Store page instead (`core/src/package.rs`).
 `.msix` from any branch, without tagging or releasing. Or build one on the
 test PC: `make msix` from the repo root (or `npm run msix` in `app`) builds
 the app and packages it with QC Buddy's identity, in
-`app\src-tauri\target\msix`.
+`app\src-tauri\target\msix`. `make msix-install` also installs it, unsigned
+(Developer Mode on). Double-clicking the unsigned `.msix` doesn't work
+(0x800B010A); upload that same unsigned file to Partner Center.
 
 **Each release**, after step 2 above:
 
