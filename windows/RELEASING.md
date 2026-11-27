@@ -1,4 +1,4 @@
-# Releasing QCBuddy (Windows)
+# Releasing QCBuddy
 
 ## Once: the update signing key
 
@@ -36,7 +36,8 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
      (the update feed entry for this version) and `SHA256SUMS.txt`.
    - **macOS** (tests, universal DMG): tags the same commit as
      `qcbuddy-macos-vX.Y.Z` and creates its own draft with
-     `QCBuddy_X.Y.Z_universal.dmg` and `SHA256SUMS.txt` (see macOS DMG).
+     `QCBuddy_X.Y.Z_universal.dmg`, a signed `.app.tar.gz` updater archive,
+     its `.sig`, `latest-darwin.json`, and `SHA256SUMS.txt` (see macOS DMG).
    If one platform fails, the other still gets its draft; fix the cause and
    **Re-run failed jobs**.
    The tag version comes from `tauri.conf.json`, not the branch name.
@@ -47,7 +48,7 @@ is in `app/src-tauri/tauri.conf.json` (`plugins.updater.pubkey`).
 3. Download the installer from the draft and check it (`HARDWARE-CHECKLIST.md`,
    install and update rows).
 4. **Publish** the draft. `windows-publish-update.yml` copies its
-   `latest-windows.json` to the permanent `qcbuddy-latest` release; installed
+   platform feed (`latest-windows.json` or `latest-darwin.json`) to the permanent `qcbuddy-latest` release; installed
    copies are offered the update at their next check (at most 6 hours).
 ## Manual release fallback
 Tag the intended commit with
@@ -58,8 +59,8 @@ tag. Tag pushes still run the same release workflow.
 
 - Installed copies read
   `https://github.com/hu13/BoseBuddy/releases/download/qcbuddy-latest/latest-{{target}}.json`;
-  on Windows that's `latest-windows.json`. A future macOS build would read
-  `latest-darwin.json`, so each platform can release on its own schedule.
+  Windows reads `latest-windows.json`, macOS reads `latest-darwin.json`.
+  Each platform can release on its own schedule.
 - `qcbuddy-latest` is a pre-release that is never marked "Latest" (the
   macOS app's releases are). Don't delete it.
 - **Roll back:** run "Windows update feed" by hand (Actions → Run workflow)
@@ -135,14 +136,30 @@ than the last; a rejected submission needs a version bump.
 silicon and Intel) `QCBuddy_X.Y.Z_universal.dmg`. `qcbuddy-release.yml` runs
 it alongside the Windows build; it tags the commit `qcbuddy-macos-vX.Y.Z`
 and creates a separate draft, "QCBuddy X.Y.Z (macOS)", which is checked and
-published on its own. Publishing it doesn't touch the Windows update feed
-(`windows-publish-update.yml` only acts on `qcbuddy-v*` releases). Actions →
+published on its own. Publishing it updates only `latest-darwin.json`; the Windows feed stays
+unchanged. The shared `windows-publish-update.yml` workflow handles both
+platforms and rejects drafts, mismatched versions, and missing updater assets. Actions →
 **macOS release** → Run workflow builds a test DMG from any branch (artifact
 only), or, with a `qcbuddy-macos-vX.Y.Z` tag, rebuilds that tag and replaces
 the files on its release.
 
-The macOS copy doesn't read the update feed yet (there's no
-`latest-darwin.json`); users download each new DMG by hand.
+Starting with 0.1.6, releases also include a universal `.app.tar.gz` and its
+Tauri signature. `latest-darwin.json` points both `darwin-aarch64` and
+`darwin-x86_64` to that archive. The app verifies the signature before
+replacing itself and restarting. The DMG remains available for first installs.
+Existing macOS builds with the updater enabled can use this feed too.
+
+The macOS release job requires the same `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` secrets used for Windows. Updater signing
+is separate from Apple code signing; never change the updater public key in
+an already released app. Artifact-only test DMG builds do not require the key.
+
+Publishing the draft promotes its feed; creating a draft does not. To roll
+back the offered macOS version, run **QCBuddy update feeds** with a previously
+published `qcbuddy-macos-vX.Y.Z` tag that contains `latest-darwin.json`.
+Before publishing, test **Check for updates → Install and restart** from an
+older installed app, verify the new version after restart and Bluetooth access,
+and confirm the feed still serves the Windows entry independently.
 
 **Signing (optional):** without these secrets the app is ad-hoc signed, and
 Gatekeeper blocks its first launch until it's allowed under System Settings

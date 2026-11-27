@@ -5,7 +5,7 @@ name: macOS release
 #
 # - qcbuddy-release.yml calls it with release: true, independently of the
 #   Windows build: it tags the commit qcbuddy-macos-vX.Y.Z and creates the
-#   macOS draft release (DMG, SHA256SUMS.txt). Windows has its own tag
+#   macOS draft release (DMG, updater archive, feed and checksums). Windows has its own tag
 #   (qcbuddy-vX.Y.Z) and draft, so either platform can fail, be re-run or be
 #   published without the other.
 # - Run it by hand (Actions → Run workflow) with no tag for a test DMG, a
@@ -138,18 +138,58 @@ jobs:
             echo "::warning::APPLE_CERTIFICATE secrets aren't set; the app is ad-hoc signed and Gatekeeper will block its first launch."
           fi
 
-      - name: Build the DMG
+      - name: Require the updater signing key for releases
+        if: steps.version.outputs.release == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
+            echo "::error::Set TAURI_SIGNING_PRIVATE_KEY to build signed macOS updates."; exit 1
+          fi
+
+      - name: Build the DMG and signed updater archive
         working-directory: windows/app
-        run: npx tauri build --target universal-apple-darwin --bundles app,dmg
+        env:
+          RELEASE_BUILD: ${{ steps.version.outputs.release }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [[ "$RELEASE_BUILD" == true ]]; then
+            npx tauri build --target universal-apple-darwin --bundles app,dmg --config src-tauri/tauri.release.conf.json
+          else
+            npx tauri build --target universal-apple-darwin --bundles app,dmg
+          fi
 
       - name: Name it and checksum it
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_BUILD: ${{ steps.version.outputs.release }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
           mkdir dist
           built="windows/app/src-tauri/target/universal-apple-darwin/release/bundle/dmg/QC Buddy_${VERSION}_universal.dmg"
           cp "$built" "dist/QCBuddy_${VERSION}_universal.dmg"
-          (cd dist && shasum -a 256 *.dmg | tee SHA256SUMS.txt)
+          if [[ "$RELEASE_BUILD" == true ]]; then
+            archive="windows/app/src-tauri/target/universal-apple-darwin/release/bundle/macos/QC Buddy.app.tar.gz"
+            asset="QCBuddy_${VERSION}_universal.app.tar.gz"
+            cp "$archive" "dist/$asset"
+            cp "$archive.sig" "dist/$asset.sig"
+            # Inspect the actual updater payload, not just the adjacent app.
+            mkdir updater-check
+            tar -xzf "dist/$asset" -C updater-check
+            app="$(find updater-check -maxdepth 2 -name '*.app' -type d -print -quit)"
+            test -n "$app"
+            codesign --verify --deep --strict "$app"
+            lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/QCBuddy"
+            test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
+            node windows/app/scripts/update-feed.mjs --platform macos --version "$VERSION" \
+              --sig "dist/$asset.sig" --url "https://github.com/$REPO/releases/download/$RELEASE_TAG/$asset" \
+              --notes "QCBuddy $VERSION. Release notes: https://github.com/$REPO/releases/tag/$RELEASE_TAG" \
+              --out dist/latest-darwin.json
+          fi
+          (cd dist && shasum -a 256 * > SHA256SUMS.txt)
 
       - uses: actions/upload-artifact@v4
         with:

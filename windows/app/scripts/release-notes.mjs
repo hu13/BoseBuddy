@@ -26,7 +26,7 @@ const footers = {
 **Already on 0.1.2 or later?** QCBuddy offers this update itself (or right-click the tray icon → **Check for updates**).`,
   macos: (version) => `**Install:** download \`QCBuddy_${version}_universal.dmg\` below (Apple silicon and Intel), open it and drag QCBuddy to Applications. If macOS says it can't check the app for malicious software, open **System Settings → Privacy & Security** and click **Open Anyway**. Allow Bluetooth access when asked.
 
-**Updating:** QCBuddy for macOS doesn't update itself yet; install each new DMG over the old copy.`,
+**Updating:** choose **Check for updates** in QCBuddy's menu, then **Install and restart**. Updates are signed and verified before installation. You can also install the DMG over an existing copy.`,
 };
 
 export function releaseNotes({ changelog, version, repo, platform = "windows" }) {
