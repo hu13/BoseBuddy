@@ -41,6 +41,8 @@ describe("release notes", () => {
     expect(notes.startsWith("- Newest change.")).toBe(true);
     expect(notes).toContain("QCBuddy_0.1.3_universal.dmg");
     expect(notes).not.toContain("x64-setup.exe");
+    expect(notes).toContain("Install and restart");
+    expect(notes).not.toContain("doesn't update itself yet");
     expect(notes).toContain("https://github.com/hu13/BoseBuddy/blob/main/windows/CHANGELOG.md");
     expect(() => releaseNotes({ changelog, version: "0.1.3", repo: "x/y", platform: "linux" })).toThrow(/Unknown platform/);
   });

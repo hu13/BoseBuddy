@@ -1,6 +1,6 @@
 [package]
 name = "qcbuddy"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 publish = false
 description = "QCBuddy: control Bose QuietComfort headphones from the Windows tray"

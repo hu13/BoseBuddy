@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildFeed, WINDOWS_PLATFORM } from "./update-feed.mjs";
+import { readFileSync } from "node:fs";
 
 const base = {
   version: "0.1.2",
@@ -10,6 +11,13 @@ const base = {
 };
 
 describe("update feed", () => {
+  it("serves the universal Mac archive to both architectures using the Rust parser fixture", () => {
+    const fixture = JSON.parse(readFileSync("scripts/fixtures/latest-darwin.json"));
+    expect(buildFeed({ platform: "macos", version: fixture.version, notes: fixture.notes,
+      pubDate: fixture.pub_date, ...fixture.platforms["darwin-aarch64"] })).toEqual(fixture);
+    expect(fixture.platforms["darwin-aarch64"]).toEqual(fixture.platforms["darwin-x86_64"]);
+    expect(fixture.platforms["windows-x86_64"]).toBeUndefined();
+  });
   it("has the shape the Tauri updater reads, for windows-x86_64", () => {
     expect(buildFeed(base)).toEqual({
       version: "0.1.2",
@@ -29,5 +37,7 @@ describe("update feed", () => {
     expect(() => buildFeed({ ...base, version: "v0.1.2" })).toThrow(/x.y.z/);
     expect(() => buildFeed({ ...base, signature: "  " })).toThrow(/signature/);
     expect(() => buildFeed({ ...base, url: "http://example.com/x.exe" })).toThrow(/https/);
+    expect(() => buildFeed({ ...base, platform: "macos", url: "https://example.com/app.dmg" })).toThrow(/archive/);
+    expect(() => buildFeed({ ...base, platform: "unknown" })).toThrow(/platform/);
   });
 });

@@ -3,6 +3,14 @@
 What changed in each QCBuddy release, newest first. The release
 page for a version shows its section from this file.
 
+## 0.1.6
+
+- **Automatic updates on macOS.** QCBuddy checks for new macOS releases and
+  offers a signed update for Apple silicon and Intel. Choose **Install and
+  restart** to update without downloading another DMG.
+- macOS update checks now use a published macOS feed instead of failing
+  because the release feed is missing. Draft releases are not offered.
+
 ## 0.1.5
 
 - Fix headphones remaining shown as connected after powering off or running

@@ -1,7 +1,7 @@
-name: Windows update feed
+name: QCBuddy update feeds
 
 # When a QCBuddy release is published (not while it's a draft), copy its
-# latest-windows.json to the permanent qcbuddy-latest release. Installed
+# platform feed to the permanent qcbuddy-latest release. Installed
 # copies read qcbuddy-latest/latest-{{target}}.json, so this is the moment
 # the update goes out. Run it by hand with an older tag to roll back.
 
@@ -11,33 +11,54 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release whose feed to serve, e.g. qcbuddy-v0.1.2"
+        description: "Published release to serve, e.g. qcbuddy-v0.1.6 or qcbuddy-macos-v0.1.6"
         required: true
 
 permissions:
   contents: write
 
+# Both platforms share qcbuddy-latest; serialize its creation and uploads.
+concurrency:
+  group: qcbuddy-update-feeds
+  cancel-in-progress: false
+
 jobs:
   feed:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'qcbuddy-v')
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'qcbuddy-v') || startsWith(github.event.release.tag_name, 'qcbuddy-macos-v')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
       - name: Get this release's feed
         run: |
-          gh release download "$TAG" --repo "$REPO" --pattern 'latest-*.json' --dir feed
-          ls feed
-          jq -e '.version and .platforms["windows-x86_64"].signature and .platforms["windows-x86_64"].url' feed/latest-windows.json
+          set -euo pipefail
+          if [[ "$TAG" =~ ^qcbuddy-macos-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            feed=latest-darwin.json
+          elif [[ "$TAG" =~ ^qcbuddy-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            feed=latest-windows.json
+          else
+            echo "::error::Not a QCBuddy release tag: $TAG"; exit 1
+          fi
+          gh api "repos/$REPO/releases/tags/$TAG" > release.json
+          gh release download "$TAG" --repo "$REPO" --pattern "$feed" --dir feed
+          node windows/app/scripts/validate-update-feed.mjs release.json "feed/$feed" "$REPO"
+          echo "FEED_FILE=$feed" >> "$GITHUB_ENV"
       - name: Serve it from qcbuddy-latest
         run: |
+          set -euo pipefail
           if ! gh release view qcbuddy-latest --repo "$REPO" >/dev/null 2>&1; then
             # A pre-release, never "Latest", so the macOS app's latest release is untouched.
             gh release create qcbuddy-latest --repo "$REPO" --prerelease --latest=false \
               --title "QCBuddy update feed" \
               --notes "Update feed read by installed copies of QCBuddy (latest-{target}.json). Don't delete; download QCBuddy from the qcbuddy-v* releases."
           fi
-          gh release upload qcbuddy-latest feed/latest-*.json --repo "$REPO" --clobber
-          echo "Serving $TAG: $(jq -r .version feed/latest-windows.json)"
+          gh release upload qcbuddy-latest "feed/$FEED_FILE" --repo "$REPO" --clobber
+          echo "Serving $TAG: $(jq -r .version "feed/$FEED_FILE")"

@@ -1,5 +1,6 @@
 //! Automatic updates (Tauri updater). QCBuddy checks the update feed at
-//! `qcbuddy-latest/latest-{{target}}.json` (latest-windows.json here) 10 s
+//! `qcbuddy-latest/latest-{{target}}.json` (latest-windows.json or
+//! latest-darwin.json) 10 s
 //! after starting and every 6 hours. A newer version is offered in the
 //! flyout; nothing is installed until the user clicks. The download is
 //! verified against the public key in tauri.conf.json, installed passively,
@@ -308,6 +309,21 @@ mod tests {
         );
         assert_eq!(release.signature("windows-x86_64").unwrap(), "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZQ==");
         assert!(release.download_url("darwin-aarch64").is_err(), "a Windows feed has no Mac entry");
+    }
+
+    #[test]
+    fn universal_macos_feed_is_readable_for_both_architectures() {
+        // The JS generator test uses this same fixture, tying release output
+        // to the parser used by the installed app.
+        let release: tauri_plugin_updater::RemoteRelease = serde_json::from_str(
+            include_str!("../../scripts/fixtures/latest-darwin.json")
+        ).unwrap();
+        assert_eq!(release.version.to_string(), "0.1.6");
+        for target in ["darwin-aarch64", "darwin-x86_64"] {
+            assert!(release.download_url(target).unwrap().as_str().ends_with("QCBuddy_0.1.6_universal.app.tar.gz"));
+            assert_eq!(release.signature(target).unwrap(), "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZQ==");
+        }
+        assert!(release.download_url("windows-x86_64").is_err());
     }
 
     /// The feed URL and key are baked into every installed copy: guard them.

@@ -3,7 +3,7 @@ name: QCBuddy CI
 # Pull requests only (and by hand); pushes don't build.
 on:
   pull_request:
-    paths: ["windows/**", ".github/workflows/qcbuddy-ci.yml", ".github/workflows/qcbuddy-release.yml", ".github/workflows/macos-release.yml"]
+    paths: ["windows/**", ".github/workflows/qcbuddy-ci.yml", ".github/workflows/qcbuddy-release.yml", ".github/workflows/macos-release.yml", ".github/workflows/windows-publish-update.yml"]
   workflow_dispatch:
 
 env:
