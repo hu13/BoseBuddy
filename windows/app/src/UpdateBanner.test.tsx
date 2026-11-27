@@ -6,6 +6,17 @@ import { UpdateBanner } from "./UpdateBanner";
 import { emit, fixtures, invokeMock, snapshot } from "./test/helpers";
 
 describe("UpdateBanner", () => {
+  it("directs macOS users to downloads without a failed-check or install action", async () => {
+    render(<UpdateBanner status={{ kind: "manualDownload", version: "0.1.5" }} />);
+    expect(screen.getByRole("status").textContent).toContain("Download macOS updates from GitHub Releases.");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("Install and restart")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "View downloads" }));
+    expect(invokeMock).toHaveBeenCalledWith("check_for_updates");
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(invokeMock).toHaveBeenCalledWith("dismiss_update_status");
+  });
+
   it("shows nothing when there's no update", () => {
     const { container } = render(<UpdateBanner status={{ kind: "none" }} />);
     expect(container.innerHTML).toBe("");

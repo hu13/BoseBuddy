@@ -28,6 +28,16 @@ export function UpdateBanner({ status }: { status: UpdateStatus }) {
           </button>
         </div>
       );
+    case "manualDownload":
+      return (
+        <div className="update" role="status">
+          <span>You're running QCBuddy {status.version}. Download macOS updates from GitHub Releases.</span>
+          <button type="button" className="link-button" onClick={() => invoke("check_for_updates").catch(() => {})}>
+            View downloads
+          </button>
+          <button type="button" className="link-button" aria-label="Dismiss" onClick={dismiss}>×</button>
+        </div>
+      );
     case "available":
       return (
         <div className="update" role="status">

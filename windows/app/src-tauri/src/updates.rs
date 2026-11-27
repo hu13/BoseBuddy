@@ -16,6 +16,7 @@
 //!
 //! The Microsoft Store copy (the same build, in an MSIX package) never reads
 //! the feed: the Store updates it, and a check by hand opens its Store page.
+//! macOS has no updater feed yet: manual checks open the release downloads.
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -39,6 +40,7 @@ pub enum UpdateStatus {
     Checking,
     /// A manual check found nothing newer than `version` (this copy).
     UpToDate { version: String },
+    ManualDownload { version: String },
     Available { version: String },
     Downloading { percent: Option<u8> },
     Installing,
@@ -78,7 +80,7 @@ impl Updates {
     pub fn dismiss(&self, app: &AppHandle) {
         let pending = self.pending.lock().ok().and_then(|p| p.as_ref().map(|u| u.version.clone()));
         let next = match self.status() {
-            UpdateStatus::UpToDate { .. } | UpdateStatus::Failed { .. } => match pending {
+            UpdateStatus::UpToDate { .. } | UpdateStatus::ManualDownload { .. } | UpdateStatus::Failed { .. } => match pending {
                 Some(version) => UpdateStatus::Available { version },
                 None => UpdateStatus::None,
             },
@@ -95,7 +97,9 @@ pub fn percent(downloaded: u64, total: Option<u64>) -> Option<u8> {
 
 /// Whether this build checks for updates.
 pub fn checks_enabled() -> bool {
-    (!cfg!(debug_assertions) || std::env::var_os("QCBUDDY_UPDATE_CHECK").is_some()) && !package::is_packaged()
+    cfg!(target_os = "windows")
+        && (!cfg!(debug_assertions) || std::env::var_os("QCBUDDY_UPDATE_CHECK").is_some())
+        && !package::is_packaged()
 }
 
 /// For a check by hand (tray menu, command-line flag): in the Store copy,
@@ -146,6 +150,21 @@ pub fn check_now(app: AppHandle) {
 
 async fn check(app: &AppHandle, manual: bool) {
     let log = Log::file(default_path());
+    // The macOS release is a manually installed DMG, not a signed updater
+    // artifact. Never request latest-darwin.json: that feed doesn't exist.
+    if cfg!(target_os = "macos") {
+        if manual {
+            set_status(app, UpdateStatus::ManualDownload { version: app.package_info().version.to_string() });
+            match std::process::Command::new("open")
+                .arg("https://github.com/hu13/BoseBuddy/releases")
+                .status()
+            {
+                Ok(status) if status.success() => log.write("update check requested: opened macOS release downloads"),
+                _ => log.write("update check requested: couldn't open macOS release downloads"),
+            }
+        }
+        return;
+    }
     // Don't interrupt an update that's downloading or installing.
     if matches!(app.state::<Updates>().status(), UpdateStatus::Downloading { .. } | UpdateStatus::Installing) {
         return;
@@ -196,6 +215,9 @@ async fn check(app: &AppHandle, manual: bool) {
 /// Download, verify and install the pending update, then restart. Called
 /// when the user clicks "Install and restart".
 pub async fn install(app: AppHandle) -> Result<(), String> {
+    if cfg!(target_os = "macos") {
+        return Err("Download and install the latest macOS DMG from GitHub Releases.".into());
+    }
     let log = Log::file(default_path());
     let update = app
         .state::<Updates>()
@@ -255,6 +277,12 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "macos")]
+    fn macos_does_not_schedule_checks_for_a_missing_feed() {
+        assert!(!checks_enabled());
+    }
+
+    #[test]
     fn status_serializes_for_the_flyout() {
         let json = |s: UpdateStatus| serde_json::to_value(s).unwrap();
         assert_eq!(json(UpdateStatus::None), serde_json::json!({"kind": "none"}));
@@ -265,6 +293,8 @@ mod tests {
         assert_eq!(json(UpdateStatus::Downloading { percent: Some(42) }), serde_json::json!({"kind": "downloading", "percent": 42}));
         assert_eq!(json(UpdateStatus::Installing), serde_json::json!({"kind": "installing"}));
         assert_eq!(json(UpdateStatus::Checking), serde_json::json!({"kind": "checking"}));
+        assert_eq!(json(UpdateStatus::ManualDownload { version: "0.1.5".into() }),
+                   serde_json::json!({"kind": "manualDownload", "version": "0.1.5"}));
         assert_eq!(
             json(UpdateStatus::UpToDate { version: "0.1.2".into() }),
             serde_json::json!({"kind": "upToDate", "version": "0.1.2"})

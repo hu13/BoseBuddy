@@ -76,6 +76,7 @@ export type UpdateStatus =
   | { kind: "none" }
   | { kind: "checking" }
   | { kind: "upToDate"; version: string }
+  | { kind: "manualDownload"; version: string }
   | { kind: "available"; version: string }
   | { kind: "downloading"; percent: number | null }
   | { kind: "installing" }
