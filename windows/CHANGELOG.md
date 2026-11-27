@@ -3,6 +3,12 @@
 What changed in each QCBuddy release, newest first. The release
 page for a version shows its section from this file.
 
+## 0.1.5
+
+- Fix headphones remaining shown as connected after powering off or running
+  out of battery. Failed Bluetooth writes now clear stale battery readings
+  and controls so QCBuddy can reconnect.
+
 ## 0.1.4
 
 - **QCBuddy for macOS.** A universal DMG (Apple silicon and Intel) of the
