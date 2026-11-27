@@ -354,6 +354,44 @@ fn background_tick_attaches_once_windows_connects_the_headset() {
 // MARK: - Edge cases
 
 #[test]
+fn closed_channel_write_failure_clears_cached_state_and_allows_reconnect() {
+    use crate::protocol::BmapError;
+
+    // Both macOS write failures and read-side closure must leave the same
+    // disconnected UI, including when the battery last reported zero.
+    for error in [BmapError::Transport("Bluetooth write failed (-1).".into()), BmapError::NotConnected] {
+        for refresh in [Controller::poll, Controller::flyout_opened, |c: &mut Controller| c.refresh(true),
+                        |c: &mut Controller| c.background_tick(true)] {
+            let (mut c, headset, _) = connected(FakeState { battery: 0, ..FakeState::default() });
+            headset.state().powered_off = true;
+            headset.state().exchange_error = Some(error.clone());
+            refresh(&mut c);
+            let s = c.state();
+            assert_eq!(s.link, LinkState::Disconnected);
+            assert_eq!(s.battery, None);
+            assert_eq!(s.channel, 0);
+            assert!(s.peers.is_empty() && s.modes.is_empty() && s.eq_bands.is_empty());
+            assert!(!s.pc_audio && !s.supports_peers);
+            assert!(s.error.as_deref().unwrap().contains("connection lost"));
+
+            headset.state().powered_off = false;
+            c.background_tick(false);
+            assert_eq!(c.state().link, LinkState::Connected);
+            assert_eq!(c.state().battery, Some(0), "zero battery alone is not a disconnect");
+        }
+    }
+}
+
+#[test]
+fn control_write_failure_preserves_independent_audio_connection() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    headset.state().exchange_error = Some(crate::protocol::BmapError::Transport("write failed".into()));
+    c.poll();
+    assert_eq!(c.state().link, LinkState::Disconnected);
+    assert!(c.state().pc_audio);
+}
+
+#[test]
 fn failure_key_ignores_durations() {
     use crate::controller::failure_key;
     let a = "No reply from the headphones when reading battery level after 2.8s [2.2 get]";

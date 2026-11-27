@@ -57,7 +57,10 @@ impl Controller {
             Err(error) => {
                 let seconds = started.elapsed().as_secs_f64();
                 self.log_failure(request_description::failure(fblock, function, op, &error, seconds));
-                if error == BmapError::NotConnected {
+                // A closed macOS channel can fail on write before we reach
+                // the read that reports NotConnected. Neither transport
+                // failure leaves a usable control link; a timeout alone can.
+                if matches!(error, BmapError::NotConnected | BmapError::Transport(_)) {
                     self.handle_control_closed();
                 }
                 Err(error)
