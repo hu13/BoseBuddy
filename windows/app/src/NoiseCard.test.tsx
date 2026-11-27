@@ -7,6 +7,12 @@ import { sent, state } from "./test/helpers";
 const slider = () => screen.getByLabelText("Noise cancelling") as HTMLInputElement;
 
 describe("NoiseCard: editing", () => {
+  it("hides unsupported profiles even if stale modes and a free slot remain", () => {
+    const { container } = render(<NoiseCard state={state("connected", { supportsModes: false })} />);
+    expect(container.innerHTML).toBe("");
+    expect(sent()).toEqual([]);
+  });
+
   it("offers + Custom when a slot is free, and creates it", async () => {
     render(<NoiseCard state={state("connected")} />);
     await userEvent.click(screen.getByRole("button", { name: "+ Custom" }));

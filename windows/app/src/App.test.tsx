@@ -32,6 +32,14 @@ describe("Header", () => {
 });
 
 describe("Noise control", () => {
+  it("hides unsupported ANC profiles while keeping supported controls", () => {
+    render(<Flyout state={state("connected", { supportsModes: false })} />);
+    expect(screen.queryByText("Noise control")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quiet" })).toBeNull();
+    expect(screen.getByText("Equalizer")).toBeTruthy();
+    expect(screen.getByText("80%")).toBeTruthy();
+  });
+
   it("highlights the current mode and its ANC level", () => {
     render(<Flyout state={state("lowBattery")} />);
     const walk = screen.getByRole("button", { name: "Walk" });

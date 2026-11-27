@@ -4,7 +4,7 @@ use super::*;
 
 impl Controller {
     pub fn set_mode(&mut self, index: u8) {
-        if !self.state.link.is_connected() {
+        if !self.state.link.is_connected() || !self.state.supports_modes {
             return;
         }
         self.begin("mode");
@@ -34,7 +34,7 @@ impl Controller {
     /// change, so it survives reconnects and the Action button cycle.
     pub fn update_mode(&mut self, index: u8, raw_cnc: u8, wind_block: bool) {
         let Some(mode) = self.state.modes.iter().find(|m| m.index == index).cloned() else { return };
-        if !self.state.link.is_connected() || !mode.editable {
+        if !self.state.link.is_connected() || !self.state.supports_modes || !mode.editable {
             return;
         }
         self.begin("mode-edit");
@@ -60,7 +60,7 @@ impl Controller {
     /// Create a mode named "Custom" in the free slot, starting from the
     /// current noise cancelling level, and switch to it.
     pub fn create_custom_mode(&mut self) {
-        if !self.state.link.is_connected() || self.state.busy.is_some() {
+        if !self.state.link.is_connected() || !self.state.supports_modes || self.state.busy.is_some() {
             return;
         }
         let Some(slot) = self.state.free_mode_slot else { return };
