@@ -126,6 +126,59 @@ fn mode_list_keeps_last_good_list() {
     headset.state().incomplete_getalls = 3;
     c.load_modes();
     assert_eq!(c.state().modes.len(), 3, "kept, not replaced by the fallback");
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().free_mode_slot, Some(3));
+}
+
+#[test]
+fn unsupported_profiles_clear_controls_and_block_profile_actions() {
+    use crate::protocol::{Op, Packet};
+    for code in [3, 4] {
+        let (mut c, headset, log) = connected(FakeState::default());
+        // Simulate a capability response with no mode records or RESULT.
+        headset.state().silent.push((31, 1));
+        headset.state().unsolicited.push(Packet::new(31, 1, Op::Error, &[code]));
+        c.load_modes();
+        assert!(!c.state().supports_modes);
+        assert!(c.state().modes.is_empty());
+        assert_eq!(c.state().mode_index, None);
+        assert_eq!(c.state().free_mode_slot, None);
+        assert_eq!(headset.state().request_log(), ["31.1 start"], "unsupported requests are not retried");
+        assert!(!log.lines().iter().any(|line| line.contains("mode list incomplete")));
+        headset.state().requests.clear();
+        c.set_mode(1);
+        c.update_mode(2, 5, true);
+        c.create_custom_mode();
+        assert!(headset.state().requests.is_empty());
+        assert_eq!(c.state().busy, None);
+    }
+}
+
+#[test]
+fn first_mode_timeout_does_not_invent_profiles_and_can_recover() {
+    let (mut c, headset, _) = connected(FakeState { silent: vec![(31, 1)], ..FakeState::default() });
+    assert!(!c.state().supports_modes);
+    assert!(c.state().modes.is_empty());
+    c.set_mode(1);
+    c.create_custom_mode();
+    assert!(headset.state().requests.is_empty());
+    headset.state().silent.clear();
+    c.load_modes();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().modes.len(), 3);
+}
+
+#[test]
+fn mode_timeouts_preserve_verified_profiles_and_actions() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    let modes = c.state().modes.clone();
+    headset.state().silent.push((31, 1));
+    c.load_modes();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().modes, modes);
+    assert_eq!(c.state().free_mode_slot, Some(3));
+    c.set_mode(1);
+    assert_eq!(headset.state().mode_index, 1);
 }
 
 #[test]
@@ -521,10 +574,19 @@ fn no_free_slot_means_no_custom_mode() {
 }
 
 #[test]
-fn headset_without_modes_gets_quiet_and_aware() {
-    let (c, _, _) = connected(FakeState { records: vec![], ..FakeState::default() });
-    let names: Vec<&str> = c.state().modes.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(names, ["Quiet", "Aware"]);
+fn headset_without_modes_does_not_get_invented_profiles() {
+    for fake in [
+        FakeState { records: vec![], ..FakeState::default() },
+        FakeState { unsupported: vec![(31, 1)], ..FakeState::default() },
+    ] {
+        let (mut c, headset, _) = connected(fake);
+        assert!(!c.state().supports_modes);
+        assert!(c.state().modes.is_empty());
+        c.set_mode(1);
+        c.update_mode(2, 5, false);
+        c.create_custom_mode();
+        assert!(headset.state().requests.is_empty());
+    }
 }
 
 #[test]
