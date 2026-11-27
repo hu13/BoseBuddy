@@ -253,6 +253,9 @@ impl Controller {
         self.refresh_paired_devices();
         if self.state.link.is_connected() {
             self.read_battery();
+            if !self.state.link.is_connected() {
+                return;
+            }
             self.read_source();
             self.load_peers();
             // Modes can be added, edited or deleted from the Bose app.
@@ -415,9 +418,8 @@ impl Controller {
             return;
         }
         self.log.write("Bluetooth connection closed");
-        self.link = None;
-        self.state.link = LinkState::Disconnected;
-        self.state.channel = 0;
+        self.disconnect();
+        self.refresh_pc_audio();
         self.set_error("Bluetooth connection lost. Computer audio may be unaffected; click Connect to reconnect.");
         self.changed();
     }
@@ -429,6 +431,9 @@ impl Controller {
             return;
         }
         self.read_battery();
+        if !self.state.link.is_connected() {
+            return;
+        }
         self.read_source();
         self.read_mode_index();
         if !deep {

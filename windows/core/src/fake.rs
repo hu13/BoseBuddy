@@ -40,6 +40,8 @@ pub struct FakeState {
     pub powered_off: bool,
     /// Whether this PC has the headset's control channel open.
     pub control_open: bool,
+    /// Transport failure returned before the next request is written.
+    pub exchange_error: Option<BmapError>,
     /// Windows shows the headset as an audio output while the local peer is connected.
     pub pc_audio_follows_local: bool,
     /// Requests the headset rejects with "unsupported function" (2.3 on a QC45).
@@ -111,6 +113,7 @@ impl Default for FakeState {
             pairing: false,
             powered_off: false,
             control_open: false,
+            exchange_error: None,
             pc_audio_follows_local: true,
             unsupported: vec![(2, 3)],
             incomplete_getalls: 0,
@@ -328,6 +331,9 @@ impl Transport for FakeLink {
         _timeout: Duration,
     ) -> Result<Vec<u8>, BmapError> {
         let mut state = self.headset.state();
+        if let Some(error) = state.exchange_error.take() {
+            return Err(error);
+        }
         if state.powered_off || !state.control_open {
             return Err(BmapError::NotConnected);
         }
