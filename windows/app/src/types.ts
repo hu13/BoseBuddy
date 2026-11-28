@@ -10,6 +10,7 @@ export type LinkState =
 export interface Mode {
   index: number;
   name: string;
+  legacyAnc?: boolean;
   /** 0 = full noise cancelling, 10 = fully aware. */
   rawCnc: number;
   windBlock: boolean;
@@ -132,6 +133,7 @@ export function ancLevel(mode: Mode): number {
 }
 
 export function ancLabel(mode: Mode): string {
+  if (mode.legacyAnc) return `ANC ${mode.name}`;
   if (mode.windBlock) return "ANC Auto · Wind Block";
   return `ANC ${ancLevel(mode)}/10`;
 }

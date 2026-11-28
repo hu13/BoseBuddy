@@ -10,6 +10,7 @@ describe("Header", () => {
   it("shows the headset, battery and who has audio", () => {
     render(<Flyout state={state("connected")} />);
     expect(screen.getByText("Bose QC45").getAttribute("title")).toBe("Firmware 4.0.4-4360+de6a887");
+    expect(screen.getByText("Firmware 4.0.4-4360+de6a887")).toBeTruthy();
     expect(screen.getByText("80%").className).not.toContain("low");
     expect(screen.getByText("Connected to: PC + Sam's MacBook Pro")).toBeTruthy();
   });
@@ -23,6 +24,7 @@ describe("Header", () => {
     render(<Flyout state={state("disconnected")} />);
     expect(screen.getByText("Not connected")).toBeTruthy();
     expect(screen.queryByText(/%$/)).toBeNull();
+    expect(screen.queryByText(/^Firmware /)).toBeNull();
   });
 
   it("says Connecting… while connecting", () => {

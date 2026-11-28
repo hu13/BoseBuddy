@@ -4,6 +4,7 @@ import type { Mock } from "vitest";
 import type { AppState, Command, EqPreset } from "../types";
 
 import connected from "../__fixtures__/connected.json";
+import qc35 from "../__fixtures__/qc35.json";
 import controlOnly from "../__fixtures__/control-only.json";
 import customMode from "../__fixtures__/custom-mode.json";
 import eqUnsaved from "../__fixtures__/eq-unsaved.json";
@@ -18,6 +19,7 @@ import slotFree from "../__fixtures__/slot-free.json";
 /** Real controller states from the core (see core/src/ui_fixtures.rs). */
 export const fixtures = {
   connected,
+  qc35,
   controlOnly,
   customMode,
   eqUnsaved,

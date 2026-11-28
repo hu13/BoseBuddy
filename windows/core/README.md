@@ -18,6 +18,22 @@ Build the macOS app using [the app instructions](../app/README.md#macos-build).
 Quit other Bose controller apps before testing the real headset. macOS logs
 and presets are in `~/Library/Application Support/QC Buddy`.
 
+## QC35 noise cancellation
+
+QC35 uses the discrete ANC setting at BMAP `1.6`, not the Quiet/Aware
+profile commands at block `31`. When the headset explicitly rejects profile
+discovery, QCBuddy probes `1.6` and offers only levels in its reported mask.
+These are fixed ANC choices in the UI: no Custom mode, Wind Block
+editor, or numeric 0–10 ANC scale. Selection sends a `1.6 SETGET` followed by
+a readback; polling also picks up changes made outside QCBuddy.
+
+Verified on a QC35 with firmware 3.0.3: `01 06 03 02 01 0b` reports current
+value 1 and mask `0x0b`, exposing High (1), Low (3), and Off (0). Each of these
+values was written and read back on hardware, then the original High setting
+was restored. Value 2 (sometimes described as Medium) is not advertised by
+this device and is not offered. Devices without valid `1.6` responses keep
+noise controls hidden; supported newer headsets continue using profiles.
+
 ## CLI
 
 ```powershell

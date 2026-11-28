@@ -23,6 +23,7 @@ fn fixtures() -> Vec<(&'static str, State)> {
 
     // This PC + MacBook hold both audio slots; MacBook playing.
     out.push(("connected", controller(FakeState::default()).state().clone()));
+    out.push(("qc35", controller(FakeState::qc35()).state().clone()));
 
     // One slot free: other devices offer Connect, not Switch.
     let mut fake = FakeState::default();

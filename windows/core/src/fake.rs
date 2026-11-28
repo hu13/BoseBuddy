@@ -28,6 +28,8 @@ pub struct FakeState {
     /// 47-byte 31.6 records, one per slot.
     pub records: Vec<Vec<u8>>,
     pub mode_index: u8,
+    /// QC35 1.6 response: current setting and supported-values mask.
+    pub legacy_anc: Option<(u8, u8)>,
     /// Level Wind Block is applying right now (1.5).
     pub live_cnc: u8,
     /// (min, max, current, band id)
@@ -99,6 +101,7 @@ impl Default for FakeState {
                 record("03 00 00 01 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 09 00 00 00 00 00"),
             ],
             mode_index: 0,
+            legacy_anc: None,
             live_cnc: 3,
             eq: vec![(-10, 10, 0, 0), (-10, 10, 0, 1), (-10, 10, 0, 2)],
             multipoint: true,
@@ -135,6 +138,18 @@ impl Default for FakeState {
 }
 
 impl FakeState {
+    /// QC35 response shape observed on firmware 3.0.3: 01 06 03 02 01 0b.
+    pub fn qc35() -> Self {
+        Self {
+            name: "Bose QC35".into(),
+            firmware: "3.0.3".into(),
+            legacy_anc: Some((1, 0x0b)),
+            records: Vec::new(),
+            eq: Vec::new(),
+            unsupported: vec![(31, 1), (31, 3), (1, 7), (1, 10), (1, 11), (2, 3)],
+            ..Self::default()
+        }
+    }
     pub fn peer(&self, mac: &str) -> Option<&FakePeer> {
         let bytes = mac_bytes(mac);
         self.peers.iter().find(|p| p.mac[..] == bytes[..])
@@ -166,6 +181,17 @@ impl FakeState {
             return error(6);
         }
         match (p.fblock, p.function, p.op) {
+            (1, 6, Op::Get) => match self.legacy_anc {
+                Some((current, mask)) => vec![status(vec![current, mask])],
+                None => error(4),
+            },
+            (1, 6, Op::SetGet) => {
+                let Some((_, mask)) = self.legacy_anc else { return error(4) };
+                let Some(&value) = p.payload.first() else { return error(6) };
+                if value > 3 || mask & (1 << value) == 0 { return error(6); }
+                self.legacy_anc = Some((value, mask));
+                vec![status(vec![value, mask])]
+            },
             (0, 1, Op::Get) => vec![status(b"1.1.0".to_vec())],
             (0, 5, Op::Get) => vec![status(self.firmware.as_bytes().to_vec())],
             (1, 2, Op::Get) => {

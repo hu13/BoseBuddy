@@ -162,6 +162,7 @@ pub struct Controller {
     on_change: Option<StateCallback>,
     /// Log every packet in hex (QCBUDDY_TRACE / the CLI's --trace).
     trace: bool,
+    legacy_anc: bool,
 }
 
 impl Controller {
@@ -176,6 +177,7 @@ impl Controller {
             light_polls: 0,
             on_change: None,
             trace: std::env::var_os("QCBUDDY_TRACE").is_some(),
+            legacy_anc: false,
         }
     }
 
@@ -397,6 +399,7 @@ impl Controller {
     }
 
     pub fn disconnect(&mut self) {
+        self.legacy_anc = false;
         self.connected_address = None;
         self.link = None;
         let keep = State {
@@ -484,6 +487,10 @@ impl Controller {
     }
 
     fn read_mode_index(&mut self) {
+        if self.legacy_anc {
+            self.read_legacy_anc();
+            return;
+        }
         if let Ok(packet) = self.get(31, 3, &[]) {
             if let Some(&index) = packet.payload.first() {
                 self.state.mode_index = (index != 0xFF).then_some(index);
@@ -532,6 +539,10 @@ impl Controller {
         if !self.state.link.is_connected() {
             return;
         }
+        if self.legacy_anc {
+            self.read_legacy_anc();
+            return;
+        }
         for attempt in 1..=3 {
             if let Ok(packets) = self.exchange(31, 1, Op::Start, &[], true, true, DEFAULT_TIMEOUT) {
                 if packets.iter().any(|p| p.is(31, 1) && p.op == Op::Error
@@ -542,6 +553,10 @@ impl Controller {
                     self.state.modes.clear();
                     self.state.mode_index = None;
                     self.state.free_mode_slot = None;
+                    // Older QC35s reject AudioModes but expose discrete ANR
+                    // at 1.6. Probe only on an explicit capability rejection.
+                    self.legacy_anc = true;
+                    self.read_legacy_anc();
                     return;
                 }
                 if packets.iter().any(|p| p.is(31, 1) && p.op == Op::Result) {

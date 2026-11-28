@@ -1,0 +1,120 @@
+{
+  "link": {
+    "kind": "connected"
+  },
+  "headphones": [
+    {
+      "address": "78:2B:64:00:00:45",
+      "name": "Bose QC35",
+      "connected": true
+    }
+  ],
+  "deviceName": "Bose QC35",
+  "productName": "Bose QC35",
+  "firmware": "3.0.3",
+  "battery": 80,
+  "charging": false,
+  "modes": [
+    {
+      "index": 1,
+      "name": "High",
+      "legacyAnc": true,
+      "rawCnc": 0,
+      "windBlock": false,
+      "editable": false,
+      "prompt": [
+        0,
+        0
+      ],
+      "storedName": "",
+      "autoCnc": false,
+      "spatial": 0
+    },
+    {
+      "index": 3,
+      "name": "Low",
+      "legacyAnc": true,
+      "rawCnc": 0,
+      "windBlock": false,
+      "editable": false,
+      "prompt": [
+        0,
+        0
+      ],
+      "storedName": "",
+      "autoCnc": false,
+      "spatial": 0
+    },
+    {
+      "index": 0,
+      "name": "Off",
+      "legacyAnc": true,
+      "rawCnc": 0,
+      "windBlock": false,
+      "editable": false,
+      "prompt": [
+        0,
+        0
+      ],
+      "storedName": "",
+      "autoCnc": false,
+      "spatial": 0
+    }
+  ],
+  "modeIndex": 1,
+  "freeModeSlot": null,
+  "eqBands": [],
+  "multipoint": false,
+  "sidetone": 0,
+  "peers": [
+    {
+      "mac": "10:00:00:00:00:02",
+      "name": "DESKTOP-QCTEST",
+      "connected": true,
+      "isLocal": true,
+      "isBoseProduct": false,
+      "active": false
+    },
+    {
+      "mac": "10:00:00:00:00:01",
+      "name": "Sam's MacBook Pro",
+      "connected": true,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": true
+    },
+    {
+      "mac": "10:00:00:00:00:04",
+      "name": "Sam's MacBook Air",
+      "connected": false,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": false
+    },
+    {
+      "mac": "10:00:00:00:00:03",
+      "name": "Sam’s iPhone",
+      "connected": false,
+      "isLocal": false,
+      "isBoseProduct": false,
+      "active": false
+    }
+  ],
+  "activePeer": "10:00:00:00:00:01",
+  "source": "bluetooth",
+  "pairingMode": false,
+  "pcAudio": true,
+  "supportsModes": true,
+  "supportsEq": false,
+  "supportsMultipoint": false,
+  "supportsSidetone": false,
+  "supportsPeers": true,
+  "peersLoaded": true,
+  "channel": 8,
+  "busy": null,
+  "peerAction": null,
+  "actionNote": null,
+  "pendingSwitch": null,
+  "error": null,
+  "askBeforeSwitch": false
+}
