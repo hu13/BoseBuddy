@@ -3,8 +3,46 @@
 use super::*;
 
 impl Controller {
+    pub(super) fn read_legacy_anc(&mut self) {
+        match self.get(1, 6, &[]) {
+            Ok(packet) => {
+                if let Some((current, modes)) = BoseMode::legacy_anc_modes(&packet.payload) {
+                    self.state.modes = modes;
+                    self.state.mode_index = Some(current);
+                    self.state.free_mode_slot = None;
+                    self.state.supports_modes = true;
+                    self.log.write(format!("ANC: {} (supported: {})", self.mode_name(current),
+                        self.state.modes.iter().map(|m| m.name.as_str()).collect::<Vec<_>>().join(", ")));
+                }
+            }
+            Err(BmapError::Device { code: 3 | 4, .. }) => {
+                self.state.supports_modes = false;
+                self.state.modes.clear();
+                self.state.mode_index = None;
+                self.state.free_mode_slot = None;
+            }
+            // Preserve previously verified settings on a transient failure.
+            Err(_) => {}
+        }
+    }
+
     pub fn set_mode(&mut self, index: u8) {
-        if !self.state.link.is_connected() {
+        if !self.state.link.is_connected() || !self.state.supports_modes {
+            return;
+        }
+        if self.legacy_anc {
+            if !self.state.modes.iter().any(|m| m.index == index) { return; }
+            self.begin("mode");
+            let result = self.exchange(1, 6, Op::SetGet, &[index], true, false, DEFAULT_TIMEOUT)
+                .and_then(|packets| ensure_ok(&packets, 1, 6));
+            // Always read back; never mark a rejected write as selected.
+            self.read_legacy_anc();
+            match result {
+                Err(error) => self.set_error(error.to_string()),
+                Ok(()) if self.state.mode_index != Some(index) => self.set_error("The headphones didn't change the ANC setting. Try again."),
+                Ok(()) => {},
+            }
+            self.end();
             return;
         }
         self.begin("mode");
@@ -34,7 +72,7 @@ impl Controller {
     /// change, so it survives reconnects and the Action button cycle.
     pub fn update_mode(&mut self, index: u8, raw_cnc: u8, wind_block: bool) {
         let Some(mode) = self.state.modes.iter().find(|m| m.index == index).cloned() else { return };
-        if !self.state.link.is_connected() || !mode.editable {
+        if !self.state.link.is_connected() || !self.state.supports_modes || self.legacy_anc || !mode.editable {
             return;
         }
         self.begin("mode-edit");
@@ -60,7 +98,7 @@ impl Controller {
     /// Create a mode named "Custom" in the free slot, starting from the
     /// current noise cancelling level, and switch to it.
     pub fn create_custom_mode(&mut self) {
-        if !self.state.link.is_connected() || self.state.busy.is_some() {
+        if !self.state.link.is_connected() || !self.state.supports_modes || self.legacy_anc || self.state.busy.is_some() {
             return;
         }
         let Some(slot) = self.state.free_mode_slot else { return };

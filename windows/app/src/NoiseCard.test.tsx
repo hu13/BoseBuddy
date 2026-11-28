@@ -7,6 +7,26 @@ import { sent, state } from "./test/helpers";
 const slider = () => screen.getByLabelText("Noise cancelling") as HTMLInputElement;
 
 describe("NoiseCard: editing", () => {
+  it("shows QC35 High/Low/Off and sends the selected wire value without profile editors", async () => {
+    render(<NoiseCard state={state("qc35")} />);
+    expect(screen.getByText("ANC High")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "High" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("button", { name: "Aware" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quiet" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Medium" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "+ Custom" })).toBeNull();
+    expect(screen.queryByLabelText("Noise cancelling")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Low" }));
+    await userEvent.click(screen.getByRole("button", { name: "Off" }));
+    expect(sent()).toEqual([{ type: "setMode", args: 3 }, { type: "setMode", args: 0 }]);
+  });
+
+  it("hides unsupported profiles even if stale modes and a free slot remain", () => {
+    const { container } = render(<NoiseCard state={state("connected", { supportsModes: false })} />);
+    expect(container.innerHTML).toBe("");
+    expect(sent()).toEqual([]);
+  });
+
   it("offers + Custom when a slot is free, and creates it", async () => {
     render(<NoiseCard state={state("connected")} />);
     await userEvent.click(screen.getByRole("button", { name: "+ Custom" }));

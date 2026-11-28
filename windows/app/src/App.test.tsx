@@ -10,6 +10,7 @@ describe("Header", () => {
   it("shows the headset, battery and who has audio", () => {
     render(<Flyout state={state("connected")} />);
     expect(screen.getByText("Bose QC45").getAttribute("title")).toBe("Firmware 4.0.4-4360+de6a887");
+    expect(screen.getByText("Firmware 4.0.4-4360+de6a887")).toBeTruthy();
     expect(screen.getByText("80%").className).not.toContain("low");
     expect(screen.getByText("Connected to: PC + Sam's MacBook Pro")).toBeTruthy();
   });
@@ -23,6 +24,7 @@ describe("Header", () => {
     render(<Flyout state={state("disconnected")} />);
     expect(screen.getByText("Not connected")).toBeTruthy();
     expect(screen.queryByText(/%$/)).toBeNull();
+    expect(screen.queryByText(/^Firmware /)).toBeNull();
   });
 
   it("says Connecting… while connecting", () => {
@@ -32,6 +34,14 @@ describe("Header", () => {
 });
 
 describe("Noise control", () => {
+  it("hides unsupported ANC profiles while keeping supported controls", () => {
+    render(<Flyout state={state("connected", { supportsModes: false })} />);
+    expect(screen.queryByText("Noise control")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Quiet" })).toBeNull();
+    expect(screen.getByText("Equalizer")).toBeTruthy();
+    expect(screen.getByText("80%")).toBeTruthy();
+  });
+
   it("highlights the current mode and its ANC level", () => {
     render(<Flyout state={state("lowBattery")} />);
     const walk = screen.getByRole("button", { name: "Walk" });

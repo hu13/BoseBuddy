@@ -3,6 +3,7 @@ import { ancLabel, ancLevel, type AppState, type Mode } from "./types";
 
 /** Mode switching (M2), editing and "+ Custom" (M4). */
 export function NoiseCard({ state }: { state: AppState }) {
+  if (!state.supportsModes) return null;
   const current = state.modes.find((m) => m.index === state.modeIndex);
   const busy = state.busy !== null;
   const canCreate = state.freeModeSlot !== null;

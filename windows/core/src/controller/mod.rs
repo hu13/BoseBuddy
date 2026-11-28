@@ -162,6 +162,7 @@ pub struct Controller {
     on_change: Option<StateCallback>,
     /// Log every packet in hex (QCBUDDY_TRACE / the CLI's --trace).
     trace: bool,
+    legacy_anc: bool,
 }
 
 impl Controller {
@@ -176,6 +177,7 @@ impl Controller {
             light_polls: 0,
             on_change: None,
             trace: std::env::var_os("QCBUDDY_TRACE").is_some(),
+            legacy_anc: false,
         }
     }
 
@@ -397,6 +399,7 @@ impl Controller {
     }
 
     pub fn disconnect(&mut self) {
+        self.legacy_anc = false;
         self.connected_address = None;
         self.link = None;
         let keep = State {
@@ -484,6 +487,10 @@ impl Controller {
     }
 
     fn read_mode_index(&mut self) {
+        if self.legacy_anc {
+            self.read_legacy_anc();
+            return;
+        }
         if let Ok(packet) = self.get(31, 3, &[]) {
             if let Some(&index) = packet.payload.first() {
                 self.state.mode_index = (index != 0xFF).then_some(index);
@@ -532,8 +539,26 @@ impl Controller {
         if !self.state.link.is_connected() {
             return;
         }
+        if self.legacy_anc {
+            self.read_legacy_anc();
+            return;
+        }
         for attempt in 1..=3 {
             if let Ok(packets) = self.exchange(31, 1, Op::Start, &[], true, true, DEFAULT_TIMEOUT) {
+                if packets.iter().any(|p| p.is(31, 1) && p.op == Op::Error
+                    && matches!(p.payload.first(), Some(3 | 4))) {
+                    // Unsupported block/function is a capability response,
+                    // not an incomplete stream worth retrying.
+                    self.state.supports_modes = false;
+                    self.state.modes.clear();
+                    self.state.mode_index = None;
+                    self.state.free_mode_slot = None;
+                    // Older QC35s reject AudioModes but expose discrete ANR
+                    // at 1.6. Probe only on an explicit capability rejection.
+                    self.legacy_anc = true;
+                    self.read_legacy_anc();
+                    return;
+                }
                 if packets.iter().any(|p| p.is(31, 1) && p.op == Op::Result) {
                     let records: Vec<&[u8]> = packets
                         .iter()
@@ -546,10 +571,13 @@ impl Controller {
                         found.push(mode);
                     }
                     found.sort_by_key(|m| m.index);
-                    self.state.modes = if found.is_empty() { BoseMode::fallback() } else { found };
+                    self.state.modes = found;
                     self.state.free_mode_slot =
                         records.iter().filter(|r| BoseMode::is_free_slot(r)).map(|r| r[0]).min();
-                    self.state.supports_modes = true;
+                    self.state.supports_modes = !self.state.modes.is_empty() || self.state.free_mode_slot.is_some();
+                    if self.state.modes.is_empty() {
+                        self.state.mode_index = None;
+                    }
                     let names: Vec<&str> = self.state.modes.iter().map(|m| m.name.as_str()).collect();
                     self.log.write(format!(
                         "modes: {}{}",
@@ -559,13 +587,14 @@ impl Controller {
                     return;
                 }
             }
+            if !self.state.link.is_connected() {
+                return;
+            }
             self.log.write(format!("mode list incomplete (attempt {attempt})"));
             self.pause(Duration::from_millis(700));
         }
-        // Keep what is on screen; only fall back when nothing was ever read.
-        if self.state.modes.is_empty() {
-            self.state.modes = BoseMode::fallback();
-        }
+        // Preserve verified modes after a timeout or incomplete stream. If
+        // none have been read, leave controls unavailable instead of guessing.
     }
 
     pub fn load_eq(&mut self) {

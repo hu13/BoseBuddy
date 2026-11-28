@@ -119,6 +119,13 @@ header {
   min-width: 0;
 }
 
+.firmware {
+  margin-top: 3px;
+  color: var(--label);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .name {
   font-size: 15px;
   font-weight: 600;

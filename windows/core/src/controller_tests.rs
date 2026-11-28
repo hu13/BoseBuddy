@@ -44,6 +44,77 @@ fn start_reads_everything() {
 }
 
 #[test]
+fn qc35_discovers_only_advertised_anc_and_uses_legacy_writes() {
+    let (mut c, headset, _) = connected(FakeState::qc35());
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().modes.iter().map(|m| m.name.as_str()).collect::<Vec<_>>(), ["High", "Low", "Off"]);
+    assert_eq!(c.state().mode_index, Some(1));
+    assert!(!c.state().supports_eq);
+    assert_eq!(c.state().free_mode_slot, None);
+    for value in [3, 0, 1] {
+        c.set_mode(value);
+        assert_eq!(headset.state().legacy_anc, Some((value, 0x0b)));
+        assert_eq!(c.state().mode_index, Some(value));
+        assert!(c.state().error.is_none());
+    }
+    assert!(headset.state().requests.iter().all(|p| p.fblock != 31));
+    assert!(headset.state().requests.iter().filter(|p| p.op == crate::protocol::Op::SetGet)
+        .all(|p| p.is(1, 6) && p.payload.len() == 1));
+    headset.state().requests.clear();
+    c.set_mode(2); // Medium is not advertised by this QC35.
+    c.set_mode(255);
+    c.update_mode(1, 5, true);
+    c.create_custom_mode();
+    assert!(headset.state().requests.is_empty());
+}
+
+#[test]
+fn qc35_refreshes_external_changes_and_preserves_state_on_timeout_or_rejection() {
+    let (mut c, headset, _) = connected(FakeState::qc35());
+    headset.state().legacy_anc = Some((3, 0x0b));
+    c.poll();
+    assert_eq!(c.state().mode_index, Some(3));
+    headset.state().silent.push((1, 6));
+    c.load_modes();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().mode_index, Some(3));
+    headset.state().silent.clear();
+    headset.state().reject_writes.push((1, 6));
+    c.set_mode(0);
+    assert_eq!(c.state().mode_index, Some(3));
+    assert!(c.state().error.is_some());
+    c.disconnect();
+    headset.state().requests.clear();
+    c.start();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().mode_index, Some(3));
+    assert!(headset.state().requests.iter().any(|p| p.is(31, 1)), "reconnect rediscovers capabilities");
+}
+
+#[test]
+fn qc35_parser_requires_valid_current_value_and_capability_mask() {
+    use crate::modes::BoseMode;
+    for bytes in [&[][..], &[1], &[4, 0xff], &[2, 0x0b], &[1, 0]] {
+        assert!(BoseMode::legacy_anc_modes(bytes).is_none());
+    }
+    let (current, modes) = BoseMode::legacy_anc_modes(&[2, 0x0f]).unwrap();
+    assert_eq!(current, 2);
+    assert_eq!(modes.len(), 4);
+    assert_eq!(modes[1].anc_label(), "ANC Medium");
+    assert!(modes.iter().all(|m| !m.editable && m.legacy_anc));
+}
+
+#[test]
+fn qc45_does_not_probe_legacy_anc_for_supported_profiles_or_timeouts() {
+    for fake in [FakeState::default(), FakeState { silent: vec![(31, 1)], ..FakeState::default() }] {
+        let headset = FakeHeadset::new(fake);
+        let mut c = Controller::new(Box::new(headset.clone()), Log::memory());
+        c.start();
+        assert!(!headset.state().requests.iter().any(|p| p.is(1, 6)));
+    }
+}
+
+#[test]
 fn unsupported_reads_are_logged_once() {
     let (mut c, _, log) = connected(FakeState::default());
     c.poll();
@@ -126,6 +197,59 @@ fn mode_list_keeps_last_good_list() {
     headset.state().incomplete_getalls = 3;
     c.load_modes();
     assert_eq!(c.state().modes.len(), 3, "kept, not replaced by the fallback");
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().free_mode_slot, Some(3));
+}
+
+#[test]
+fn unsupported_profiles_clear_controls_and_block_profile_actions() {
+    use crate::protocol::{Op, Packet};
+    for code in [3, 4] {
+        let (mut c, headset, log) = connected(FakeState::default());
+        // Simulate a capability response with no mode records or RESULT.
+        headset.state().silent.push((31, 1));
+        headset.state().unsolicited.push(Packet::new(31, 1, Op::Error, &[code]));
+        c.load_modes();
+        assert!(!c.state().supports_modes);
+        assert!(c.state().modes.is_empty());
+        assert_eq!(c.state().mode_index, None);
+        assert_eq!(c.state().free_mode_slot, None);
+        assert_eq!(headset.state().request_log(), ["31.1 start", "1.6 get"], "probe legacy ANC once without retrying unsupported profiles");
+        assert!(!log.lines().iter().any(|line| line.contains("mode list incomplete")));
+        headset.state().requests.clear();
+        c.set_mode(1);
+        c.update_mode(2, 5, true);
+        c.create_custom_mode();
+        assert!(headset.state().requests.is_empty());
+        assert_eq!(c.state().busy, None);
+    }
+}
+
+#[test]
+fn first_mode_timeout_does_not_invent_profiles_and_can_recover() {
+    let (mut c, headset, _) = connected(FakeState { silent: vec![(31, 1)], ..FakeState::default() });
+    assert!(!c.state().supports_modes);
+    assert!(c.state().modes.is_empty());
+    c.set_mode(1);
+    c.create_custom_mode();
+    assert!(headset.state().requests.is_empty());
+    headset.state().silent.clear();
+    c.load_modes();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().modes.len(), 3);
+}
+
+#[test]
+fn mode_timeouts_preserve_verified_profiles_and_actions() {
+    let (mut c, headset, _) = connected(FakeState::default());
+    let modes = c.state().modes.clone();
+    headset.state().silent.push((31, 1));
+    c.load_modes();
+    assert!(c.state().supports_modes);
+    assert_eq!(c.state().modes, modes);
+    assert_eq!(c.state().free_mode_slot, Some(3));
+    c.set_mode(1);
+    assert_eq!(headset.state().mode_index, 1);
 }
 
 #[test]
@@ -521,10 +645,19 @@ fn no_free_slot_means_no_custom_mode() {
 }
 
 #[test]
-fn headset_without_modes_gets_quiet_and_aware() {
-    let (c, _, _) = connected(FakeState { records: vec![], ..FakeState::default() });
-    let names: Vec<&str> = c.state().modes.iter().map(|m| m.name.as_str()).collect();
-    assert_eq!(names, ["Quiet", "Aware"]);
+fn headset_without_modes_does_not_get_invented_profiles() {
+    for fake in [
+        FakeState { records: vec![], ..FakeState::default() },
+        FakeState { unsupported: vec![(31, 1)], ..FakeState::default() },
+    ] {
+        let (mut c, headset, _) = connected(fake);
+        assert!(!c.state().supports_modes);
+        assert!(c.state().modes.is_empty());
+        c.set_mode(1);
+        c.update_mode(2, 5, false);
+        c.create_custom_mode();
+        assert!(headset.state().requests.is_empty());
+    }
 }
 
 #[test]

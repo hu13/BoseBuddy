@@ -18,6 +18,9 @@ use crate::protocol::string;
 pub struct BoseMode {
     pub index: u8,
     pub name: String,
+    /// QC35 discrete ANR setting (1.6), not a newer AudioModes profile.
+    #[serde(skip_serializing_if = "is_false")]
+    pub legacy_anc: bool,
     /// 0 is full noise cancelling, 10 is fully aware.
     pub raw_cnc: u8,
     /// Wind Block adjusts noise cancelling automatically; while it is on the
@@ -34,11 +37,14 @@ pub struct BoseMode {
 
 pub const CUSTOM_NAME: &str = "Custom";
 
+fn is_false(value: &bool) -> bool { !value }
+
 impl BoseMode {
     pub fn new(index: u8, name: &str, raw_cnc: u8) -> BoseMode {
         BoseMode {
             index,
             name: name.into(),
+            legacy_anc: false,
             raw_cnc,
             wind_block: false,
             editable: false,
@@ -61,7 +67,9 @@ impl BoseMode {
 
     /// Text for the Noise control header.
     pub fn anc_label(&self) -> String {
-        if self.wind_block {
+        if self.legacy_anc {
+            format!("ANC {}", self.name)
+        } else if self.wind_block {
             "ANC Auto · Wind Block".into()
         } else {
             format!("ANC {}/10", self.anc_level())
@@ -95,6 +103,7 @@ impl BoseMode {
         Some(BoseMode {
             index,
             name,
+            legacy_anc: false,
             raw_cnc: b.get(cnc_offset).copied().unwrap_or(0),
             wind_block: short_layout && b[46] != 0,
             editable: b[3] != 0,
@@ -103,6 +112,19 @@ impl BoseMode {
             auto_cnc: short_layout && b[43] != 0,
             spatial: if short_layout { b[44] } else { 0 },
         })
+    }
+
+    /// QC35 STATUS [1.6]: current value followed by a supported-values mask.
+    /// Only offer values advertised by the headset; 2 is absent on many QC35s.
+    pub fn legacy_anc_modes(payload: &[u8]) -> Option<(u8, Vec<BoseMode>)> {
+        let (&current, rest) = payload.split_first()?;
+        let &mask = rest.first()?;
+        if current > 3 || mask & (1 << current) == 0 { return None; }
+        let modes = [(1, "High"), (2, "Medium"), (3, "Low"), (0, "Off")]
+            .into_iter().filter(|(value, _)| mask & (1 << value) != 0)
+            .map(|(value, name)| BoseMode { legacy_anc: true, ..BoseMode::new(value, name, 0) })
+            .collect();
+        Some((current, modes))
     }
 
     /// Whether a record describes an editable slot with no mode in it.

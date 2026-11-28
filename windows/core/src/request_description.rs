@@ -50,6 +50,7 @@ fn feature(fblock: u8, function: u8) -> Option<&'static str> {
         (1, 2) => "headphone name",
         (1, 3) => "voice prompts",
         (1, 5) => "noise cancelling level",
+        (1, 6) => "ANC setting",
         (1, 7) => "EQ",
         (1, 9) => "button settings",
         (1, 10) => "multipoint",

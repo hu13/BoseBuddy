@@ -186,6 +186,9 @@ export function Header({ state }: { state: AppState }) {
           <span className={`dot ${dot}`} />
           {status}
         </div>
+        {link.kind === "connected" && state.firmware && (
+          <div className="firmware">Firmware {state.firmware}</div>
+        )}
       </div>
       {battery !== null && (
         <div className={`battery ${battery <= 20 ? "low" : ""}`} title={state.charging ? "Charging" : "Battery"}>
